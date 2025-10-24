@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Invoice PDF Parser → Excel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- pdf.js (text extraction) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
+  <!-- SheetJS (XLSX export) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.20.0/xlsx.full.min.js"></script>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+    h1 { font-size: 1.4rem; margin: 0 0 12px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; max-width: 980px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .hint { font-size: 0.9rem; color: #444; margin: 4px 0 12px; }
+    input[type="file"] { padding: 8px; border: 1px dashed #aaa; border-radius: 10px; background: #fafafa; }
+    button { padding: 10px 14px; border-radius: 10px; border: 1px solid #444; background: #111; color: #fff; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    table { border-collapse: collapse; margin-top: 16px; width: 100%; font-size: 13px; }
+    th, td { border: 1px solid #e5e5e5; padding: 6px 8px; text-align: left; }
+    th { background: #f7f7f7; position: sticky; top: 0; }
+    .pill { background: #eef6ff; color: #094; padding: 2px 8px; border-radius: 100px; font-size: 12px; }
+    .muted { color: #666; }
+    .ok { color: #0a7f2e; }
+    .warn { color: #a66a00; }
+  </style>
+</head>
+<body>
+  <h1>Invoice PDF Parser → Excel</h1>
+  <div class="card">
+    <div class="hint">
+      Upload one or more PDFs (same structure as your Amended/Customs Invoice).  
+      The app will extract line items and export an Excel matching your attached format.
+    </div>
+    <div class="row" style="margin-bottom: 8px;">
+      <input id="fileInput" type="file" accept="application/pdf" multiple />
+      <button id="parseBtn" disabled>Parse PDFs</button>
+      <button id="downloadBtn" disabled>Download Excel</button>
+      <span id="status" class="muted"></span>
+    </div>
+    <div class="hint">
+      Mapping filled: <span class="pill">InvoiceNumber</span>,
+      <span class="pill">InvoiceDate</span>,
+      <span class="pill">InvoiceTotal</span>,
+      <span class="pill">SupplierName</span>,
+      <span class="pill">BuyerPartNumber</span>,
+      <span class="pill">SupplierPartNumber</span>,
+      <span class="pill">Quantity</span>,
+      <span class="pill">UnitOfMeasure</span>,
+      <span class="pill">NetWeight</span>,
+      <span class="pill">ItemTotal</span>,
+      and (calculated) <span class="pill">UnitPrice</span>.
+    </div>
+    <div id="tableWrap"></div>
+  </div>
+
+  <script>
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+
+    const fileInput = document.getElementById('fileInput');
+    const parseBtn = document.getElementById('parseBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const statusEl = document.getElementById('status');
+    const tableWrap = document.getElementById('tableWrap');
+
+    let rows = []; // aggregated output rows across all PDFs
+
+    // Columns taken from your attached format (we'll populate the important ones and leave the rest blank)
+    const OUTPUT_COLUMNS = [
+      "InvoiceNumber","InvoiceDate","InvoiceTotal","SupplierMID","SupplierName",
+      "BuyerPartNumber","SupplierPartNumber","Quantity","UnitOfMeasure","Description",
+      "UnitPrice","ItemTotal","CurrencyCode","ExchangeRate","CountryOfOrigin","CountryOfExport",
+      "GrossWeight","GrossWeightUnit","NetWeight","TariffNumber","TariffDescription",
+      "Quantity1","GrossWeightUnit2","NetWeightUnit","GrossWeightUnit3","NetWeight","TariffNumber2",
+      // The above list includes placeholders; we’ll ensure the truly used set below:
+    ];
+
+    // We’ll use this final ordered list (based on the preview you shared).
+    const FINAL_COLUMNS = [
+      "InvoiceNumber",
+      "InvoiceDate",
+      "InvoiceTotal",
+      "SupplierMID",
+      "SupplierName",
+      "BuyerPartNumber",
+      "SupplierPartNumber",
+      "Quantity",
+      "UnitOfMeasure",
+      "Description",
+      "UnitPrice",
+      "ItemTotal",
+      "CurrencyCode",
+      "ExchangeRate",
+      "CountryOfOrigin",
+      "CountryOfExport",
+      "GrossWeight",
+      "GrossWeightUnit",
+      "NetWeight",
+      "TariffNumber",
+      "TariffDescription",
+      "Quantity1",
+      "UnitOfMeasure1",
+      "Quantity2",
+      "UnitOfMeasure2",
+      "Quantity3",
+      "UnitOfMeasure3",
+      "PrimarySPI",
+      "SecondarySPI",
+      "DeliverTo",
+      "SoldTo",
+      "SecondaryTariffNumber"
+    ];
+
+    // Minimal helpers
+    const toNumber = (s) => {
+      if (s == null) return null;
+      const n = Number(String(s).replace(/,/g, ''));
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const safeRound = (num, decimals = 5) => {
+      if (num == null || !Number.isFinite(num)) return null;
+      const f = Math.pow(10, decimals);
+      return Math.round(num * f) / f;
+    };
+
+    // === Parsing from raw text ===
+
+    function extractHeader(text) {
+      // Invoice number: "Customs Invoice 90286988" or "invoice 90286988"
+      const invMatch = text.match(/(?:Customs\s+Invoice|invoice)\s+(\d{5,})/i);
+      const invoiceNumber = invMatch ? invMatch[1] : "";
+
+      // Date: "from 10/01/2025"
+      const dateMatch = text.match(/\bfrom\s+(\d{2}\/\d{2}\/\d{4})\b/i);
+      const invoiceDate = dateMatch ? dateMatch[1] : "";
+
+      // Invoice Total: "Overall amount in USD 130,408.94"
+      const totalMatch = text.match(/Overall amount in USD\s+([\d,]+\.\d{2})\b/i);
+      const invoiceTotal = totalMatch ? totalMatch[1].replace(/,/g, "") : "";
+
+      // SupplierName: grab the supplier line before "Mankiew"
+      // Example: "Norix Lackfabrik GmbH & Co. KG, Industriegebiet, D-27383 Scheefel"
+      let supplierName = "";
+      const supBlock = text.match(/(?:Amended\s+customs\s+)?invoice\s+\d+\s+([\s\S]{0,200}?)\s+Mankiew/i);
+      if (supBlock && supBlock[1]) {
+        supplierName = supBlock[1]
+          .replace(/\s+/g, " ")
+          .replace(/\s*,\s*$/, "")
+          .trim();
+      }
+
+      return { invoiceNumber, invoiceDate, invoiceTotal, supplierName };
+    }
+
+    function extractLineItems(text) {
+      // We’ll split probable item blocks starting with: position number + product no.
+      // Example item line (single wrapped line when text is normalized):
+      // "24 14500.0000.0.511 4.0 can(s) x 1.000 PT 4.000 PT 9.54750 USD/PT 38.19 ... 0.473 L 1.892 L"
+      const normalized = text.replace(/\s+/g, " "); // easier matching
+      const itemRegex = /\b\d{1,3}\s+([A-Z0-9]{3,}\.\S+?)\s+([\d.]+)\s+([A-Za-z()]+).*?USD\/[A-Z]+\s+([\d,]+\.\d{2})/gi;
+
+      // We’ll find segments more completely to also capture L/KG units.
+      // Strategy: after product number, collect a chunk until "USD/<UOM> <total>" then parse within.
+      const chunks = [];
+      let m;
+      const greedy = /\b\d{1,3}\s+([A-Z0-9]{3,}\.[^\s]+)([\s\S]*?)([\d.,]+\s+USD\/[A-Z]+)\s+([\d,]+\.\d{2})/gi;
+      while ((m = greedy.exec(text)) !== null) {
+        const productNo = m[1];
+        const middle = m[2];
+        const priceUnitStr = m[3]; // contains "USD/<UOM>"
+        const totalStr = m[4];
+        chunks.push({ productNo, middle, priceUnitStr, totalStr });
+      }
+
+      const items = [];
+
+      for (const c of chunks) {
+        const productNoFull = c.productNo; // e.g., "14500.0000.0.511"
+        const buyerSupplierPart = (productNoFull.split(".")[0] || "").replace(/[^\d]/g, "").slice(0, 5);
+
+        // Quantity: first number after product number in the middle
+        let qty = null;
+        const qtyMatch = c.middle.match(/^\s*([\d.]+)\s+([A-Za-z()]+)/);
+        if (qtyMatch) {
+          qty = toNumber(qtyMatch[1]);
+        } else {
+          const anyQty = c.middle.match(/([\d.]+)\s+[A-Za-z()]+/);
+          qty = anyQty ? toNumber(anyQty[1]) : null;
+        }
+
+        // UnitOfMeasure: take the unit used in the "Total quantities" area if present,
+        // i.e., the LAST occurrence of "<number> <UOM>" before the price/unit.
+        let unitOfMeasure = null;
+        const allUoms = [...c.middle.matchAll(/([\d.]+)\s+([A-Z]{1,4})\b/g)];
+        if (allUoms.length) {
+          const last = allUoms[allUoms.length - 1];
+          unitOfMeasure = last[2]; // e.g., PT, KG, GAL, QT, L
+        } else {
+          // fallback: use price unit from "USD/<UOM>"
+          const priceUnit = c.priceUnitStr.match(/USD\/([A-Z]+)/i);
+          if (priceUnit) unitOfMeasure = priceUnit[1];
+        }
+
+        // NetWeight: second occurrence of "<number> L" within item chunk if present, else null
+        // (Based on your guidance: take the total liters figure)
+        let netWeight = null;
+        const liters = [...c.middle.matchAll(/([\d.]+)\s+L\b/g)];
+        if (liters.length >= 2) {
+          netWeight = toNumber(liters[1][1]); // the "total L"
+        } else if (liters.length === 1) {
+          // sometimes only one L value is present; use it as fallback
+          netWeight = toNumber(liters[0][1]);
+        } else {
+          // If L not present, try KG total (second KG)
+          const kgs = [...c.middle.matchAll(/([\d.]+)\s+KG\b/gi)];
+          if (kgs.length >= 2) netWeight = toNumber(kgs[1][1]);
+          else if (kgs.length === 1) netWeight = toNumber(kgs[0][1]);
+        }
+
+        const itemTotal = toNumber(c.totalStr);
+        const unitPrice = qty ? safeRound(itemTotal / qty, 5) : null;
+
+        items.push({
+          productNoFull,
+          buyerSupplierPart,
+          quantity: qty,
+          unitOfMeasure: unitOfMeasure || "",
+          netWeight,
+          itemTotal,
+          unitPrice
+        });
+      }
+
+      return items;
+    }
+
+    async function pdfToText(file) {
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      let text = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items.map(it => it.str).join(" ");
+        text += pageText + "\n";
+      }
+      return text;
+    }
+
+    function buildOutputRows(header, items, fileName) {
+      const {
+        invoiceNumber, invoiceDate, invoiceTotal, supplierName
+      } = header;
+
+      const invTotalNum = toNumber(invoiceTotal);
+
+      const out = items.map(it => {
+        const base = Object.fromEntries(FINAL_COLUMNS.map(c => [c, ""]));
+        base["InvoiceNumber"] = invoiceNumber || "";
+        base["InvoiceDate"] = invoiceDate || "";
+        base["InvoiceTotal"] = invTotalNum != null ? invTotalNum : "";
+        base["SupplierName"] = supplierName || "";
+        base["BuyerPartNumber"] = it.buyerSupplierPart || "";
+        base["SupplierPartNumber"] = it.buyerSupplierPart || "";
+        base["Quantity"] = it.quantity != null ? it.quantity : "";
+        base["UnitOfMeasure"] = it.unitOfMeasure || "";
+        base["NetWeight"] = it.netWeight != null ? it.netWeight : "";
+        base["ItemTotal"] = it.itemTotal != null ? it.itemTotal : "";
+        base["UnitPrice"] = it.unitPrice != null ? it.unitPrice : "";
+        base["Description"] = ""; // not requested; available if needed
+        base["CurrencyCode"] = "USD"; // sensible default per samples
+        base["DeliverTo"] = "";
+        base["SoldTo"] = "";
+        // keep the rest blank
+        return base;
+      });
+
+      // If a PDF somehow has header but 0 item rows, still emit one header-only row (rare)
+      if (out.length === 0 && (invoiceNumber || supplierName)) {
+        const base = Object.fromEntries(FINAL_COLUMNS.map(c => [c, ""]));
+        base["InvoiceNumber"] = invoiceNumber || "";
+        base["InvoiceDate"] = invoiceDate || "";
+        base["InvoiceTotal"] = invTotalNum != null ? invTotalNum : "";
+        base["SupplierName"] = supplierName || "";
+        out.push(base);
+      }
+
+      return out;
+    }
+
+    function renderTable(data) {
+      if (!data.length) { tableWrap.innerHTML = ""; return; }
+      const cols = FINAL_COLUMNS; // keep consistent
+      const thead = `<thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead>`;
+      const tbody = `<tbody>${data.map(row => {
+        return `<tr>${cols.map(c => `<td>${row[c] ?? ""}</td>`).join("")}</tr>`;
+      }).join("")}</tbody>`;
+      tableWrap.innerHTML = `<div class="hint"><span class="ok">Parsed rows:</span> ${data.length}</div><div style="max-height: 55vh; overflow:auto;"><table>${thead}${tbody}</table></div>`;
+    }
+
+    function downloadXlsx(data) {
+      const cols = FINAL_COLUMNS;
+      const aoa = [cols];
+      for (const r of data) {
+        aoa.push(cols.map(c => r[c] === undefined ? "" : r[c]));
+      }
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Parsed");
+      XLSX.writeFile(wb, "parsed_invoices.xlsx");
+    }
+
+    // UI handlers
+    fileInput.addEventListener('change', () => {
+      parseBtn.disabled = !fileInput.files.length;
+      downloadBtn.disabled = true;
+      rows = [];
+      renderTable(rows);
+      statusEl.textContent = fileInput.files.length
+        ? `Ready to parse ${fileInput.files.length} file(s)…`
+        : '';
+    });
+
+    parseBtn.addEventListener('click', async () => {
+      const files = Array.from(fileInput.files || []);
+      if (!files.length) return;
+      parseBtn.disabled = true;
+      downloadBtn.disabled = true;
+      rows = [];
+      statusEl.textContent = "Parsing… this may take a moment per PDF.";
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        statusEl.textContent = `Parsing (${i+1}/${files.length}): ${f.name}`;
+        try {
+          const txt = await pdfToText(f);
+          const header = extractHeader(txt);
+          const items = extractLineItems(txt);
+          const out = buildOutputRows(header, items, f.name);
+          rows.push(...out);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      statusEl.textContent = `Done. Parsed ${rows.length} row(s).`;
+      renderTable(rows);
+      downloadBtn.disabled = rows.length === 0;
+      parseBtn.disabled = false;
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      if (!rows.length) return;
+      downloadXlsx(rows);
+    });
+  </script>
+</body>
+</html>
