@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manki Invoice Parser</title>
+    <title>Manki Invoice Parser - DEBUG</title>
     
     <!-- External Libraries -->
     <script src="https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
@@ -24,7 +24,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
@@ -47,6 +47,15 @@
         .header p {
             opacity: 0.9;
             font-size: 1.1em;
+        }
+
+        .badge {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 0.9em;
         }
 
         .main-content {
@@ -131,30 +140,41 @@
             background: #6c757d;
         }
 
-        .btn-secondary:hover {
-            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
-        }
-
-        .btn-danger {
-            background: #dc3545;
-        }
-
-        .btn-danger:hover {
-            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4);
-        }
-
         .btn-success {
             background: #28a745;
-        }
-
-        .btn-success:hover {
-            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
         }
 
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
+        }
+
+        .debug-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .debug-section h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .debug-text {
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
 
         .stats-grid {
@@ -181,63 +201,6 @@
         .stat-value {
             font-size: 1.8em;
             font-weight: 700;
-        }
-
-        .table-container {
-            overflow-x: auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9em;
-        }
-
-        th {
-            background: #667eea;
-            color: white;
-            padding: 15px 10px;
-            text-align: left;
-            font-weight: 600;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        td {
-            padding: 12px 10px;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        tr:hover {
-            background: #f8f9fa;
-        }
-
-        input[type="text"],
-        input[type="number"],
-        input[type="date"],
-        textarea {
-            width: 100%;
-            padding: 6px 8px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 0.9em;
-            font-family: inherit;
-        }
-
-        input:focus,
-        textarea:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        textarea {
-            min-height: 60px;
-            resize: vertical;
         }
 
         .alert {
@@ -269,6 +232,12 @@
             border: 1px solid #bee5eb;
         }
 
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
         .loading {
             display: none;
             text-align: center;
@@ -294,16 +263,38 @@
             100% { transform: rotate(360deg); }
         }
 
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #6c757d;
+        .table-container {
+            overflow-x: auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
         }
 
-        .empty-state-icon {
-            font-size: 4em;
-            margin-bottom: 20px;
-            opacity: 0.5;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
         }
 
         .divider {
@@ -312,24 +303,19 @@
             margin: 20px 0;
         }
 
-        .action-btns {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .delete-btn {
-            background: #dc3545;
+        .copy-btn {
+            background: #6c757d;
             color: white;
             border: none;
-            padding: 4px 8px;
+            padding: 6px 12px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.8em;
+            font-size: 0.85em;
+            margin-top: 10px;
         }
 
-        .delete-btn:hover {
-            background: #c82333;
+        .copy-btn:hover {
+            background: #5a6268;
         }
 
         @media (max-width: 968px) {
@@ -341,32 +327,15 @@
                 border-right: none;
                 border-bottom: 1px solid #e9ecef;
             }
-
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 576px) {
-            .header h1 {
-                font-size: 1.8em;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .content-area {
-                padding: 20px;
-            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📄 Manki Invoice Parser</h1>
-            <p>Extract, edit, and export customs invoice data</p>
+            <h1>🔍 Manki Invoice Parser - DEBUG MODE</h1>
+            <p>Debug version to see extracted text and troubleshoot parsing</p>
+            <div class="badge">⚙️ Development Version</div>
         </div>
 
         <div class="main-content">
@@ -380,70 +349,44 @@
                     <input type="file" id="fileInput" class="file-input" accept=".pdf">
                 </div>
 
-                <button class="btn" id="parseBtn" disabled>🔍 Parse Invoice</button>
+                <button class="btn" id="parseBtn" disabled>🔍 Parse & Debug</button>
 
                 <div class="divider"></div>
 
-                <h2>📊 Data Operations</h2>
+                <h2>⬇️ Download Debug</h2>
                 
-                <button class="btn btn-secondary" id="addRowBtn">➕ Add New Row</button>
-                <button class="btn btn-danger" id="clearBtn">🗑️ Clear All Data</button>
-
-                <div class="divider"></div>
-
-                <h2>⬇️ Download</h2>
-                
+                <button class="btn btn-success" id="downloadTextBtn" disabled>📥 Download Extracted Text</button>
                 <button class="btn btn-success" id="downloadExcelBtn" disabled>📥 Download Excel</button>
-                <button class="btn btn-success" id="downloadCsvBtn" disabled>📥 Download CSV</button>
             </div>
 
             <div class="content-area">
                 <div class="alert alert-success" id="successAlert"></div>
                 <div class="alert alert-error" id="errorAlert"></div>
                 <div class="alert alert-info" id="infoAlert"></div>
+                <div class="alert alert-warning" id="warningAlert"></div>
 
                 <div class="loading" id="loading">
                     <div class="spinner"></div>
                     <p>Processing invoice...</p>
                 </div>
 
-                <div id="emptyState" class="empty-state">
-                    <div class="empty-state-icon">📋</div>
-                    <h2>No Data Yet</h2>
-                    <p>Upload a PDF invoice to get started, or add rows manually</p>
-                </div>
-
-                <div id="dataSection" style="display: none;">
+                <div id="debugContent" style="display: none;">
                     <div class="stats-grid" id="statsGrid"></div>
-                    
-                    <div class="action-btns">
-                        <button class="btn btn-secondary" id="addRowTopBtn" style="width: auto;">➕ Add Row</button>
+
+                    <div class="debug-section">
+                        <h3>📄 Extracted Text (First 5000 characters)</h3>
+                        <div class="debug-text" id="extractedText"></div>
+                        <button class="copy-btn" onclick="copyToClipboard('extractedText')">📋 Copy Text</button>
                     </div>
 
-                    <div class="table-container">
-                        <table id="dataTable">
-                            <thead>
-                                <tr>
-                                    <th>Actions</th>
-                                    <th>Invoice #</th>
-                                    <th>Date</th>
-                                    <th>Invoice Total</th>
-                                    <th>Supplier MID</th>
-                                    <th>Supplier Name</th>
-                                    <th>Buyer Part #</th>
-                                    <th>Supplier Part #</th>
-                                    <th>Quantity</th>
-                                    <th>UOM</th>
-                                    <th>Description</th>
-                                    <th>Unit Price</th>
-                                    <th>Item Total</th>
-                                    <th>Currency</th>
-                                    <th>Country</th>
-                                    <th>Net Weight</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tableBody"></tbody>
-                        </table>
+                    <div class="debug-section">
+                        <h3>🔍 Parsed Metadata</h3>
+                        <div class="debug-text" id="metadataDebug"></div>
+                    </div>
+
+                    <div class="debug-section" id="lineItemsSection">
+                        <h3>📊 Parsed Line Items</h3>
+                        <div class="table-container" id="lineItemsTable"></div>
                     </div>
                 </div>
             </div>
@@ -451,40 +394,37 @@
     </div>
 
     <script>
-        // Configure PDF.js worker with unpkg CDN
+        // Configure PDF.js worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
 
         // Application state
-        let invoiceData = [];
+        let extractedFullText = '';
+        let parsedData = null;
         let uploadedFile = null;
 
         // DOM elements
         const fileInput = document.getElementById('fileInput');
         const uploadSection = document.getElementById('uploadSection');
         const parseBtn = document.getElementById('parseBtn');
-        const addRowBtn = document.getElementById('addRowBtn');
-        const addRowTopBtn = document.getElementById('addRowTopBtn');
-        const clearBtn = document.getElementById('clearBtn');
+        const downloadTextBtn = document.getElementById('downloadTextBtn');
         const downloadExcelBtn = document.getElementById('downloadExcelBtn');
-        const downloadCsvBtn = document.getElementById('downloadCsvBtn');
-        const tableBody = document.getElementById('tableBody');
-        const emptyState = document.getElementById('emptyState');
-        const dataSection = document.getElementById('dataSection');
         const loading = document.getElementById('loading');
         const successAlert = document.getElementById('successAlert');
         const errorAlert = document.getElementById('errorAlert');
         const infoAlert = document.getElementById('infoAlert');
+        const warningAlert = document.getElementById('warningAlert');
+        const debugContent = document.getElementById('debugContent');
+        const extractedText = document.getElementById('extractedText');
+        const metadataDebug = document.getElementById('metadataDebug');
+        const lineItemsTable = document.getElementById('lineItemsTable');
         const statsGrid = document.getElementById('statsGrid');
 
         // Event Listeners
         uploadSection.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', handleFileSelect);
         parseBtn.addEventListener('click', parseInvoice);
-        addRowBtn.addEventListener('click', addNewRow);
-        addRowTopBtn.addEventListener('click', addNewRow);
-        clearBtn.addEventListener('click', clearAllData);
+        downloadTextBtn.addEventListener('click', downloadText);
         downloadExcelBtn.addEventListener('click', downloadExcel);
-        downloadCsvBtn.addEventListener('click', downloadCsv);
 
         // Drag and drop
         uploadSection.addEventListener('dragover', (e) => {
@@ -522,17 +462,54 @@
 
             showLoading(true);
             hideAlerts();
+            debugContent.style.display = 'none';
 
             try {
+                // Extract text
                 const text = await extractTextFromPDF(uploadedFile);
-                const parsedData = parseInvoiceText(text);
+                extractedFullText = text;
                 
-                invoiceData = parsedData;
-                renderTable();
-                updateStats();
-                
-                showAlert('success', `✅ Successfully parsed ${parsedData.length} line items!`);
-                showDataSection(true);
+                console.log('=== EXTRACTED TEXT ===');
+                console.log(text);
+                console.log('=== END TEXT ===');
+
+                // Show first 5000 chars
+                extractedText.textContent = text.substring(0, 5000) + (text.length > 5000 ? '\n\n... (truncated, see console for full text)' : '');
+
+                // Parse invoice
+                const data = parseInvoiceText(text);
+                parsedData = data;
+
+                // Show metadata
+                const metadata = {
+                    invoiceNumber: data.invoiceNumber || 'NOT FOUND',
+                    invoiceDate: data.invoiceDate || 'NOT FOUND',
+                    invoiceTotal: data.invoiceTotal || 'NOT FOUND',
+                    supplierName: data.supplierName || 'NOT FOUND',
+                    supplierMID: data.supplierMID || 'NOT FOUND',
+                    lineItemsCount: data.lineItems.length
+                };
+
+                metadataDebug.textContent = JSON.stringify(metadata, null, 2);
+
+                // Show line items
+                if (data.lineItems.length > 0) {
+                    renderLineItemsTable(data.lineItems);
+                    showAlert('success', `✅ Successfully parsed ${data.lineItems.length} line items!`);
+                } else {
+                    lineItemsTable.innerHTML = '<p style="padding: 20px; color: #dc3545;">❌ No line items found. Check the extracted text above to see what was captured from the PDF.</p>';
+                    showAlert('warning', '⚠️ Parsed 0 line items. The PDF text may not match expected format. Review extracted text below.');
+                }
+
+                // Update stats
+                updateStats(metadata);
+
+                // Enable buttons
+                downloadTextBtn.disabled = false;
+                downloadExcelBtn.disabled = data.lineItems.length > 0;
+
+                debugContent.style.display = 'block';
+
             } catch (error) {
                 console.error('Parse error:', error);
                 showAlert('error', `Error parsing PDF: ${error.message}`);
@@ -549,7 +526,12 @@
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(' ');
+                
+                // Get text with more detail
+                const pageText = textContent.items.map(item => {
+                    return item.str;
+                }).join(' ');
+                
                 fullText += pageText + '\n';
             }
             
@@ -567,39 +549,32 @@
             // Extract line items
             const lineItems = extractLineItems(text);
 
-            // Convert to data format
-            const data = lineItems.map(item => ({
+            return {
                 invoiceNumber,
                 invoiceDate,
                 invoiceTotal,
-                supplierMID,
                 supplierName,
-                buyerPartNumber: item.productCode || '',
-                supplierPartNumber: item.productCode || '',
-                quantity: item.quantity || 0,
-                unitOfMeasure: item.unit || '',
-                description: item.productName || '',
-                unitPrice: item.unitPrice || 0,
-                itemTotal: item.lineTotal || 0,
-                currencyCode: 'USD',
-                countryOfOrigin: 'DE',
-                netWeight: item.netWeight || null
-            }));
-
-            return data;
+                supplierMID,
+                lineItems
+            };
         }
 
         function extractInvoiceNumber(text) {
             const patterns = [
                 /Customs\s+Invoice\s+(\d+)/i,
                 /invoice\s+(\d+)/i,
-                /Invoice\s+No\.?\s*:?\s*(\d+)/i
+                /Invoice\s+No\.?\s*:?\s*(\d+)/i,
+                /Invoice\s*#\s*(\d+)/i
             ];
 
             for (const pattern of patterns) {
                 const match = text.match(pattern);
-                if (match) return match[1];
+                if (match) {
+                    console.log('Found invoice number:', match[1]);
+                    return match[1];
+                }
             }
+            console.log('Invoice number not found');
             return '';
         }
 
@@ -607,17 +582,20 @@
             const patterns = [
                 /from\s+(\d{2}\/\d{2}\/\d{4})/,
                 /Date:\s*(\d{2}\/\d{2}\/\d{4})/,
-                /Invoice\s+Date:\s*(\d{2}\/\d{2}\/\d{4})/
+                /Invoice\s+Date:\s*(\d{2}\/\d{2}\/\d{4})/,
+                /(\d{2}\/\d{2}\/\d{4})/
             ];
 
             for (const pattern of patterns) {
                 const match = text.match(pattern);
                 if (match) {
-                    // Convert MM/DD/YYYY to YYYY-MM-DD
                     const [month, day, year] = match[1].split('/');
-                    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                    const formatted = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                    console.log('Found invoice date:', formatted);
+                    return formatted;
                 }
             }
+            console.log('Invoice date not found');
             return '';
         }
 
@@ -625,15 +603,19 @@
             const patterns = [
                 /Total\s+net\s+amount\s+([\d,]+\.?\d*)/i,
                 /Overall\s+amount\s+in\s+USD\s+([\d,]+\.?\d*)/i,
-                /Invoice\s+Total:\s+\$?([\d,]+\.?\d*)/i
+                /Invoice\s+Total:\s+\$?([\d,]+\.?\d*)/i,
+                /Total:\s+\$?([\d,]+\.?\d*)/i
             ];
 
             for (const pattern of patterns) {
                 const match = text.match(pattern);
                 if (match) {
-                    return parseFloat(match[1].replace(/,/g, ''));
+                    const total = parseFloat(match[1].replace(/,/g, ''));
+                    console.log('Found invoice total:', total);
+                    return total;
                 }
             }
+            console.log('Invoice total not found');
             return 0;
         }
 
@@ -643,9 +625,13 @@
             for (const line of lines) {
                 if (line.includes('GmbH') || line.includes('Lackfabrik') || line.includes('Fabrik')) {
                     const match = line.match(/([A-Za-z\s]+ GmbH & Co\. KG)/);
-                    if (match) return match[1].trim();
+                    if (match) {
+                        console.log('Found supplier:', match[1].trim());
+                        return match[1].trim();
+                    }
                 }
             }
+            console.log('Supplier not found');
             return '';
         }
 
@@ -674,6 +660,9 @@
             const items = [];
             const lines = text.split('\n');
             
+            console.log('=== SEARCHING FOR LINE ITEMS ===');
+            console.log('Total lines:', lines.length);
+            
             const itemPattern = /^\s*(\d+)\s+([A-Z0-9]+\.[A-Z0-9]+\.[A-Z0-9]+\.[A-Z0-9]+)/;
             
             for (let i = 0; i < lines.length; i++) {
@@ -681,12 +670,14 @@
                 const itemMatch = line.match(itemPattern);
                 
                 if (itemMatch) {
+                    console.log('Found line item match at line', i, ':', line);
+                    
                     const position = itemMatch[1];
                     const productCodeFull = itemMatch[2];
                     const productCode = productCodeFull.split('.')[0].substring(0, 5);
                     
                     // Extract quantity and unit
-                    const qtyUnitPattern = /([\d,]+\.[\d]+)\s+(KG|PC|PT|QT|GAL|CN|CAT)\s+([\d.]+)\s+USD/;
+                    const qtyUnitPattern = /([\d,]+\.[\d]+)\s+(KG|PC|PT|QT|GAL|CN|CAT|L)\s+([\d.]+)\s+USD/;
                     const qtyMatch = line.match(qtyUnitPattern);
                     
                     let quantity = 0, unit = '', unitPrice = 0;
@@ -695,43 +686,24 @@
                         quantity = parseFloat(qtyMatch[1].replace(/,/g, ''));
                         unit = qtyMatch[2];
                         unitPrice = parseFloat(qtyMatch[3]);
-                    }
-                    
-                    // Extract price per unit if not found
-                    if (!unitPrice) {
-                        const pricePattern = /([\d.]+)\s+USD\/([A-Z]+)/;
-                        const priceMatch = line.match(pricePattern);
-                        if (priceMatch) {
-                            unitPrice = parseFloat(priceMatch[1]);
-                            if (!unit) unit = priceMatch[2];
-                        }
+                        console.log('  Quantity:', quantity, unit, 'Price:', unitPrice);
                     }
                     
                     // Extract line total
                     const totalPattern = /([\d,]+\.\d{2})\s*$/;
                     const totalMatch = line.match(totalPattern);
                     const lineTotal = totalMatch ? parseFloat(totalMatch[1].replace(/,/g, '')) : 0;
+                    console.log('  Line total:', lineTotal);
                     
-                    // Get product name and net weight from next line
+                    // Get product name
                     let productName = '';
                     let netWeight = null;
                     
                     if (i + 1 < lines.length) {
                         const nextLine = lines[i + 1].trim();
-                        
-                        if (nextLine && !nextLine.match(/^\d+\s+/) && 
-                            !nextLine.startsWith('Your PO') && 
-                            !nextLine.startsWith('Commodity')) {
-                            
-                            const weightPattern = /([\d.]+)\s+L\s+([\d.]+)\s+L\s*$/;
-                            const weightMatch = nextLine.match(weightPattern);
-                            
-                            if (weightMatch) {
-                                netWeight = parseFloat(weightMatch[2]);
-                                productName = nextLine.replace(weightPattern, '').trim();
-                            } else {
-                                productName = nextLine;
-                            }
+                        if (nextLine && !nextLine.match(/^\d+\s+/)) {
+                            productName = nextLine;
+                            console.log('  Product name:', productName);
                         }
                     }
                     
@@ -756,161 +728,51 @@
                 }
             }
             
+            console.log('=== FOUND', items.length, 'LINE ITEMS ===');
             return items;
         }
 
-        function addNewRow() {
-            const newRow = {
-                invoiceNumber: '',
-                invoiceDate: '',
-                invoiceTotal: 0,
-                supplierMID: '',
-                supplierName: '',
-                buyerPartNumber: '',
-                supplierPartNumber: '',
-                quantity: 0,
-                unitOfMeasure: '',
-                description: '',
-                unitPrice: 0,
-                itemTotal: 0,
-                currencyCode: 'USD',
-                countryOfOrigin: 'DE',
-                netWeight: null
-            };
-            
-            invoiceData.push(newRow);
-            renderTable();
-            updateStats();
-            showDataSection(true);
-        }
+        function renderLineItemsTable(items) {
+            let html = '<table><thead><tr>';
+            html += '<th>Pos</th><th>Product Code</th><th>Product Name</th><th>Qty</th>';
+            html += '<th>Unit</th><th>Unit Price</th><th>Line Total</th>';
+            html += '</tr></thead><tbody>';
 
-        function deleteRow(index) {
-            if (confirm('Are you sure you want to delete this row?')) {
-                invoiceData.splice(index, 1);
-                renderTable();
-                updateStats();
-                
-                if (invoiceData.length === 0) {
-                    showDataSection(false);
-                }
-            }
-        }
-
-        function clearAllData() {
-            if (confirm('Are you sure you want to clear all data?')) {
-                invoiceData = [];
-                uploadedFile = null;
-                fileInput.value = '';
-                parseBtn.disabled = true;
-                renderTable();
-                showDataSection(false);
-                showAlert('info', 'All data cleared');
-            }
-        }
-
-        function renderTable() {
-            tableBody.innerHTML = '';
-            
-            invoiceData.forEach((row, index) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><button class="delete-btn" onclick="deleteRow(${index})">🗑️</button></td>
-                    <td><input type="text" value="${row.invoiceNumber}" onchange="updateCell(${index}, 'invoiceNumber', this.value)"></td>
-                    <td><input type="date" value="${row.invoiceDate}" onchange="updateCell(${index}, 'invoiceDate', this.value)"></td>
-                    <td><input type="number" step="0.01" value="${row.invoiceTotal}" onchange="updateCell(${index}, 'invoiceTotal', parseFloat(this.value))"></td>
-                    <td><input type="text" value="${row.supplierMID}" onchange="updateCell(${index}, 'supplierMID', this.value)"></td>
-                    <td><input type="text" value="${row.supplierName}" onchange="updateCell(${index}, 'supplierName', this.value)"></td>
-                    <td><input type="text" value="${row.buyerPartNumber}" onchange="updateCell(${index}, 'buyerPartNumber', this.value)"></td>
-                    <td><input type="text" value="${row.supplierPartNumber}" onchange="updateCell(${index}, 'supplierPartNumber', this.value)"></td>
-                    <td><input type="number" step="0.001" value="${row.quantity}" onchange="updateQuantity(${index}, parseFloat(this.value))"></td>
-                    <td><input type="text" value="${row.unitOfMeasure}" onchange="updateCell(${index}, 'unitOfMeasure', this.value)"></td>
-                    <td><textarea onchange="updateCell(${index}, 'description', this.value)">${row.description}</textarea></td>
-                    <td><input type="number" step="0.00001" value="${row.unitPrice.toFixed(5)}" onchange="updateUnitPrice(${index}, parseFloat(this.value))"></td>
-                    <td><input type="number" step="0.01" value="${row.itemTotal.toFixed(2)}" onchange="updateItemTotal(${index}, parseFloat(this.value))"></td>
-                    <td><input type="text" value="${row.currencyCode}" onchange="updateCell(${index}, 'currencyCode', this.value)"></td>
-                    <td><input type="text" value="${row.countryOfOrigin}" onchange="updateCell(${index}, 'countryOfOrigin', this.value)"></td>
-                    <td><input type="number" step="0.001" value="${row.netWeight || ''}" onchange="updateCell(${index}, 'netWeight', this.value ? parseFloat(this.value) : null)"></td>
-                `;
-                tableBody.appendChild(tr);
+            items.forEach(item => {
+                html += `<tr>
+                    <td>${item.position}</td>
+                    <td>${item.productCodeFull}</td>
+                    <td>${item.productName}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.unit}</td>
+                    <td>$${item.unitPrice.toFixed(5)}</td>
+                    <td>$${item.lineTotal.toFixed(2)}</td>
+                </tr>`;
             });
 
-            // Enable download buttons if we have data
-            downloadExcelBtn.disabled = invoiceData.length === 0;
-            downloadCsvBtn.disabled = invoiceData.length === 0;
+            html += '</tbody></table>';
+            lineItemsTable.innerHTML = html;
         }
 
-        function updateCell(index, field, value) {
-            invoiceData[index][field] = value;
-            updateStats();
-        }
-
-        function updateQuantity(index, value) {
-            invoiceData[index].quantity = value;
-            // Recalculate unit price
-            if (value > 0 && invoiceData[index].itemTotal > 0) {
-                invoiceData[index].unitPrice = invoiceData[index].itemTotal / value;
-            }
-            renderTable();
-            updateStats();
-        }
-
-        function updateUnitPrice(index, value) {
-            invoiceData[index].unitPrice = value;
-            // Recalculate item total
-            invoiceData[index].itemTotal = value * invoiceData[index].quantity;
-            renderTable();
-            updateStats();
-        }
-
-        function updateItemTotal(index, value) {
-            invoiceData[index].itemTotal = value;
-            // Recalculate unit price
-            if (invoiceData[index].quantity > 0) {
-                invoiceData[index].unitPrice = value / invoiceData[index].quantity;
-            }
-            renderTable();
-            updateStats();
-        }
-
-        function updateStats() {
-            if (invoiceData.length === 0) {
-                statsGrid.innerHTML = '';
-                return;
-            }
-
-            const totalRows = invoiceData.length;
-            const invoiceNumber = invoiceData[0]?.invoiceNumber || 'N/A';
-            const invoiceTotal = invoiceData[0]?.invoiceTotal || 0;
-            const itemsTotal = invoiceData.reduce((sum, row) => sum + (row.itemTotal || 0), 0);
-
+        function updateStats(metadata) {
             statsGrid.innerHTML = `
                 <div class="stat-card">
-                    <div class="stat-label">Total Rows</div>
-                    <div class="stat-value">${totalRows}</div>
+                    <div class="stat-label">Invoice Number</div>
+                    <div class="stat-value" style="font-size: 1.3em;">${metadata.invoiceNumber}</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">Invoice Number</div>
-                    <div class="stat-value" style="font-size: 1.3em;">${invoiceNumber}</div>
+                    <div class="stat-label">Invoice Date</div>
+                    <div class="stat-value" style="font-size: 1.3em;">${metadata.invoiceDate}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-label">Invoice Total</div>
-                    <div class="stat-value">$${invoiceTotal.toFixed(2)}</div>
+                    <div class="stat-value">$${metadata.invoiceTotal}</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">Items Total</div>
-                    <div class="stat-value">$${itemsTotal.toFixed(2)}</div>
+                    <div class="stat-label">Line Items Found</div>
+                    <div class="stat-value">${metadata.lineItemsCount}</div>
                 </div>
             `;
-        }
-
-        function showDataSection(show) {
-            if (show) {
-                emptyState.style.display = 'none';
-                dataSection.style.display = 'block';
-            } else {
-                emptyState.style.display = 'block';
-                dataSection.style.display = 'none';
-            }
         }
 
         function showLoading(show) {
@@ -923,6 +785,7 @@
             let alert;
             if (type === 'success') alert = successAlert;
             else if (type === 'error') alert = errorAlert;
+            else if (type === 'warning') alert = warningAlert;
             else alert = infoAlert;
             
             alert.textContent = message;
@@ -930,43 +793,59 @@
             
             setTimeout(() => {
                 alert.classList.remove('show');
-            }, 5000);
+            }, 10000);
         }
 
         function hideAlerts() {
             successAlert.classList.remove('show');
             errorAlert.classList.remove('show');
             infoAlert.classList.remove('show');
+            warningAlert.classList.remove('show');
+        }
+
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                showAlert('success', '✅ Copied to clipboard!');
+            });
+        }
+
+        function downloadText() {
+            const blob = new Blob([extractedFullText], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'extracted_text.txt';
+            link.click();
+            showAlert('success', '✅ Downloaded extracted text');
         }
 
         function downloadExcel() {
-            if (invoiceData.length === 0) return;
+            if (!parsedData || parsedData.lineItems.length === 0) return;
 
             const wsData = [
                 [
                     'InvoiceNumber', 'InvoiceDate', 'InvoiceTotal', 'SupplierMID', 'SupplierName',
-                    'BuyerPartNumber', 'SupplierPartNumber', 'Quantity', 'UnitOfMeasure', 'Description',
-                    'UnitPrice', 'ItemTotal', 'CurrencyCode', 'CountryOfOrigin', 'NetWeight'
+                    'Position', 'ProductCode', 'ProductCodeFull', 'ProductName', 'Quantity', 
+                    'Unit', 'UnitPrice', 'LineTotal', 'NetWeight'
                 ]
             ];
 
-            invoiceData.forEach(row => {
+            parsedData.lineItems.forEach(item => {
                 wsData.push([
-                    row.invoiceNumber,
-                    row.invoiceDate,
-                    row.invoiceTotal,
-                    row.supplierMID,
-                    row.supplierName,
-                    row.buyerPartNumber,
-                    row.supplierPartNumber,
-                    row.quantity,
-                    row.unitOfMeasure,
-                    row.description,
-                    row.unitPrice,
-                    row.itemTotal,
-                    row.currencyCode,
-                    row.countryOfOrigin,
-                    row.netWeight
+                    parsedData.invoiceNumber,
+                    parsedData.invoiceDate,
+                    parsedData.invoiceTotal,
+                    parsedData.supplierMID,
+                    parsedData.supplierName,
+                    item.position,
+                    item.productCode,
+                    item.productCodeFull,
+                    item.productName,
+                    item.quantity,
+                    item.unit,
+                    item.unitPrice,
+                    item.lineTotal,
+                    item.netWeight
                 ]);
             });
 
@@ -975,58 +854,9 @@
             XLSX.utils.book_append_sheet(wb, ws, 'Invoice Data');
 
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-            const filename = `manki_invoice_${timestamp}.xlsx`;
-            
-            XLSX.writeFile(wb, filename);
-            showAlert('success', `✅ Downloaded: ${filename}`);
+            XLSX.writeFile(wb, `manki_invoice_debug_${timestamp}.xlsx`);
+            showAlert('success', '✅ Downloaded Excel file');
         }
-
-        function downloadCsv() {
-            if (invoiceData.length === 0) return;
-
-            const headers = [
-                'InvoiceNumber', 'InvoiceDate', 'InvoiceTotal', 'SupplierMID', 'SupplierName',
-                'BuyerPartNumber', 'SupplierPartNumber', 'Quantity', 'UnitOfMeasure', 'Description',
-                'UnitPrice', 'ItemTotal', 'CurrencyCode', 'CountryOfOrigin', 'NetWeight'
-            ];
-
-            let csv = headers.join(',') + '\n';
-
-            invoiceData.forEach(row => {
-                const values = [
-                    row.invoiceNumber,
-                    row.invoiceDate,
-                    row.invoiceTotal,
-                    row.supplierMID,
-                    `"${row.supplierName}"`,
-                    row.buyerPartNumber,
-                    row.supplierPartNumber,
-                    row.quantity,
-                    row.unitOfMeasure,
-                    `"${row.description.replace(/"/g, '""')}"`,
-                    row.unitPrice,
-                    row.itemTotal,
-                    row.currencyCode,
-                    row.countryOfOrigin,
-                    row.netWeight || ''
-                ];
-                csv += values.join(',') + '\n';
-            });
-
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-            const filename = `manki_invoice_${timestamp}.csv`;
-            
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            link.click();
-            
-            showAlert('success', `✅ Downloaded: ${filename}`);
-        }
-
-        // Initialize
-        showDataSection(false);
     </script>
 </body>
 </html>
