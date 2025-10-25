@@ -7,22 +7,26 @@
   <!-- XLSX (SheetJS) for exports -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- PDF.js main library -->
+  <!-- PDF.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
-  <!-- Inline pdf.js worker for GitHub Pages (fixes getDocument undefined / cross‑origin worker) -->
   <script>
-    (function(){
+    (function () {
       try {
-        window.pdfjsLib = window['pdfjs-dist/build/pdf'];
-        const workerBlob = new Blob([
-          "importScripts('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js');"
-        ], { type: 'application/javascript' });
-        const workerUrl = URL.createObjectURL(workerBlob);
-        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
-      } catch(e) {
-        console.error('Failed to initialize pdf.js worker', e);
+        // Correct global in pdf.js 4.x
+        if (window.pdfjsLib) {
+          const workerBlob = new Blob([
+            "importScripts('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js');"
+          ], { type: "application/javascript" });
+          const workerUrl = URL.createObjectURL(workerBlob);
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+          console.log("✅ pdf.js initialized successfully");
+        } else {
+          console.error("⚠️ pdfjsLib not found; pdf.js failed to load.");
+        }
+      } catch (e) {
+        console.error("Failed to initialize pdf.js worker:", e);
       }
     })();
-  </script>
   <style>
     /* ====== Original purple styling (polished) ====== */
     * { box-sizing: border-box; }
