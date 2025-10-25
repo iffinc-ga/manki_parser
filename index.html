@@ -3,442 +3,148 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MANKI Parser (React, Full)</title>
+  <title>MANKI Parser (Stable React Version)</title>
 
-  <!-- Tailwind (CDN) -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- React + ReactDOM + Babel -->
+  <!-- React & Babel -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- SheetJS for Excel -->
+  <!-- SheetJS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <!-- ✅ pdf.js (UMD) with guaranteed onload initialization -->
+  <!-- pdf.js -->
   <script id="pdfjs-loader" src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
   <script>
     document.getElementById("pdfjs-loader").addEventListener("load", function () {
-      if (window.pdfjsLib) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc =
-          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js";
-        console.log("✅ pdf.js fully loaded and worker configured");
-        window._pdfReady = true;
-        document.dispatchEvent(new CustomEvent("pdfjs-ready"));
-      } else {
-        console.error("❌ pdf.js did not expose window.pdfjsLib");
+      try {
+        if (window.pdfjsLib) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js";
+          console.log("✅ pdf.js fully loaded and worker configured");
+          window._pdfReady = true;
+        } else {
+          console.error("❌ pdf.js failed to initialize properly");
+        }
+      } catch (e) {
+        console.error("⚠️ Error initializing pdf.js:", e);
       }
     });
   </script>
 
   <style>
-    /* Sticky layers: header(0) -> controls(1) -> stats(2) -> thead(3) */
     .sticky-header { position: sticky; top: 0; z-index: 40;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
     .sticky-bar    { position: sticky; top: 76px; z-index: 30; }
     .sticky-stats  { position: sticky; top: 128px; z-index: 20; }
     .sticky-thead  { position: sticky; top: 216px; z-index: 10; }
-    .table-area    { height: calc(100vh - 76px - 52px - 88px); overflow: auto; }
-    .notes-panel   { height: calc(100vh - 216px - 16px); }
-    .mono          { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .table-area    { height: calc(100vh - 300px); overflow: auto; }
+    .notes-panel   { height: calc(100vh - 250px); overflow: auto; }
+    .mono          { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
   <div id="root"></div>
 
   <script type="text/babel">
-    /***********************
-     * Utilities & Globals *
-     ***********************/
-    const { useEffect, useMemo, useRef, useState } = React;
+    const { useState, useRef, useMemo } = React;
 
-    const fmt2 = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const money = (n) => isFinite(+n) ? `$${fmt2.format(+n)}` : "$0.00";
-    const toNumber = (s) => s == null ? NaN : Number(String(s).replace(/[,\\s]/g, ''));
-    const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
+    const money = (n) => isFinite(+n) ? `$${(+n).toFixed(2)}` : "$0.00";
+    const toNum = (v) => Number(String(v).replace(/[,\\s]/g, "")) || 0;
 
-    // Regex to detect invoice blocks and amended markers (tuned to your PDFs)
-    const RE_INVOICE_HDR = /Customs\s+Invoice\s+(\d{6,})\s+from\s+(\d{2}\/\d{2}\/\d{4})/gi;
-    const RE_AMENDED    = /Amended\s+customs\s+invoice\s+(\d{6,})/gi;
+    const STATIC_NOTES = { };
 
-    // Sticky notes per invoice (edit freely)
-    const STATIC_NOTES = {
-      // "90286993": ["Check positions 10 & 12 – PDF wraps caused misreads"],
-      // "90286992": ["Verify 'Total customs value' used in calc"]
-    };
-
-    // Known positions that are commonly missed due to PDF wraps (helps surface hints)
-    const KNOWN_MISSING = {
-      // '90286988': [26, 28, 67],
-      // '90286989': [31],
-      // '90286992': [10],
-      // '90286993': []
-    };
-
-    /*********************
-     * pdf.js extraction *
-     *********************/
-    async function extractPdfTextFromFile(file) {
+    async function extractPdfText(file) {
       if (!window.pdfjsLib) throw new Error("pdf.js not available");
       const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
       let text = "";
       for (let p = 1; p <= pdf.numPages; p++) {
         const page = await pdf.getPage(p);
-        const content = await page.getTextContent();
-        // Join with newlines so broken lines still get grouped heuristically
-        text += content.items.map(i => i.str).join("\\n") + "\\n";
+        const c = await page.getTextContent();
+        text += c.items.map(i => i.str).join("\\n") + "\\n";
       }
       return text;
     }
 
-    /****************
-     * Heuristics   *
-     ****************/
-    function findSupplier(block) {
-      const SUP_RE =
-        /(R[üu]dt\s+Industrielacke\s+GmbH\s*&\s*Co\.?\s*KG|Norix\s+Lackf\s*abrik\s+GmbH\s*&\s*Co\.?\s*KG|Finalin\s+GmbH\s*&\s*Co\.?\s*KG|Mankiewic[zx]\s+Coatings,?\s+LLC)/i;
-      const m = block.match(SUP_RE);
-      return m ? clean(m[1]) : "";
-    }
-    function findOverallAmount(block) {
-      const m = block.match(/Overall\s+amount\s+in\s+USD\s+([0-9,]+\.[0-9]{2})/i);
-      return m ? m[1] : "";
-    }
-
-    // Group lines into chunks that start with a position number (10/12/20... or 2–3 digits)
-    function parseLineChunks(block) {
-      const chunks = [];
-      const lines = block.split(/\\n+/);
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (/^\\s*\\d{1,3}\\b/.test(line)) {
-          let j = i + 1;
-          const c = [line];
-          while (j < lines.length && !/^\\s*\\d{1,3}\\b/.test(lines[j])) {
-            c.push(lines[j]);
-            j++;
-          }
-          chunks.push(c.join("\\n"));
-          i = j - 1;
-        }
-      }
-      return chunks;
-    }
-
-    // Extract fields from one chunk; push helpful notes if things are odd/missing
-    function extractFromChunk(txt, invNo, notesByInvoice) {
-      const notes = (notesByInvoice[invNo] ||= []);
-
-      const mPos = txt.match(/^\\s*(\\d{1,3})\\b/);
-      const position = mPos ? mPos[1] : "";
-      if (!position) notes.push("A line without a valid position was skipped.");
-
-      // Part no: first token that looks like a product/part code (alnum, dots/hyphens allowed)
-      let part = "";
-      const afterPos = txt.replace(/^\\s*\\d{1,3}\\s+/, "");
-      const mPart = afterPos.match(/^([A-Z0-9][A-Z0-9\\.\\-]+)/i);
-      if (mPart) part = mPart[1]; else notes.push(`Pos ${position || "?"}: missing/odd part number.`);
-
-      // Quantity + Unit (handles "288.000 KG", "180.000 PT", "24.0 ... x 12.000 KG 288.000 KG")
-      let quantity = "", unit = "";
-      // 1) “<num> <UNIT>” (direct)
-      let mQty = txt.match(/\\b(\\d+(?:\\.\\d+)?)\\s*(KG|GAL|QT|PT|FOZ|L|PC|PCS)\\b(?!\\/)/i);
-      // 2) fallback: last numeric+unit on the line chunk (e.g., total quantity segment)
-      if (!mQty) mQty = txt.match(/(\\d+(?:\\.\\d+)?)\\s*(KG|GAL|QT|PT|FOZ|L|PC|PCS)(?![\\s\\S]*\\d+\\s*(KG|GAL|QT|PT|FOZ|L|PC|PCS))/i);
-      if (mQty) { quantity = mQty[1]; unit = mQty[2].toUpperCase(); }
-
-      // Unit price: "<num> USD/<UNIT or CN>"
-      let unit_price = "";
-      const mUP = txt.match(/([0-9]+\\.[0-9]+)\\s*USD\\/(?:KG|GAL|QT|PT|FOZ|L|CN|PC|PCS)/i);
-      if (mUP) unit_price = mUP[1]; else notes.push(`Pos ${position || "?"}: unit price not found.`);
-
-      // Line total: prefer “Total price USD <num>”, else last currency-like number
-      let line_total = "";
-      let mLT = txt.match(/Total\\s+price\\s+USD\\s*([0-9,]+\\.[0-9]{2})/i);
-      if (!mLT) {
-        mLT = txt.match(/\\b([0-9]{1,3}(?:,[0-9]{3})*\\.[0-9]{2})\\b(?![\\s\\S]*\\b\\d{1,3}(?:,\\d{3})*\\.\\d{2}\\b)/);
-      }
-      if (mLT) line_total = mLT[1]; else notes.push(`Pos ${position || "?"}: line total not found.`);
-
-      // Net weight (when available)
-      let net_weight = "";
-      const mNW = txt.match(/net\\s+weight\\s*[:\\s]\\s*(\\d+(?:\\.\\d+)?)/i);
-      if (mNW) net_weight = mNW[1];
-
-      // Country (2-letter derived from text)
-      let country_of_origin = "";
-      const mCO = txt.match(/Country\\s+of\\s+origin\\s*:\\s*([A-Za-z ]+)/i);
-      if (mCO) country_of_origin = clean(mCO[1]).slice(0,2).toUpperCase();
-
-      const calc_total = (isFinite(+quantity) && isFinite(+unit_price)) ? (+quantity * +unit_price) : NaN;
-      if (!position && !part && !line_total) return null;
-
-      return {
-        position: position || "",
-        part_number: part || "",
-        quantity: quantity || "",
-        unit: unit || "",
-        unit_price: unit_price || "",
-        line_total: line_total || "",
-        calc_total: isFinite(calc_total) ? fmt2.format(calc_total) : "",
-        net_weight: net_weight || "",
-        country_of_origin: country_of_origin || ""
-      };
-    }
-
-    // Parse full text into invoices + rows, while accumulating notes
-    function parseInvoicesFromText(fullText, notesByInvoice) {
-      const headers = [];
-      for (const m of fullText.matchAll(RE_INVOICE_HDR)) headers.push({ index: m.index, number: m[1], date: m[2] });
-      for (const m of fullText.matchAll(RE_AMENDED)) {
-        if (!headers.some((h) => h.number === m[1])) headers.push({ index: m.index, number: m[1], date: "" });
-      }
-      if (!headers.length) {
-        const m = fullText.match(/Invoice\\s+(\\d{6,})/i);
-        if (m) headers.push({ index: 0, number: m[1], date: "" });
-      }
-      headers.sort((a, b) => a.index - b.index);
-
+    function parseInvoices(txt) {
       const invoices = [];
       const rows = [];
-
-      for (let i = 0; i < headers.length; i++) {
-        const h = headers[i];
-        const end = i < headers.length - 1 ? headers[i + 1].index : fullText.length;
-        const block = fullText.slice(h.index, end);
-
-        const supplier = findSupplier(block);
-        const total = findOverallAmount(block);
-        const invMeta = { invoice_number: h.number, invoice_date: h.date || "", supplier, invoice_total: total };
-
-        const chunks = parseLineChunks(block);
-        const parsed = chunks.map((ch) => extractFromChunk(ch, h.number, notesByInvoice)).filter(Boolean);
-
-        // Reconciliation note
-        const sum = parsed.reduce((a, r) => a + (toNumber(r.line_total) || 0), 0);
-        const diff = (toNumber(total) || 0) - sum;
-        if (toNumber(total) && Math.abs(diff) > 0.01) {
-          (notesByInvoice[h.number] ||= []).push(
-            `Sum of lines ${money(sum)} differs from invoice total ${money(total)} by ${money(diff)}`
-          );
+      const notes = {};
+      const matches = [...txt.matchAll(/Customs\\s+Invoice\\s+(\\d{6,})/gi)];
+      if (!matches.length) return { invoices, rows, notes };
+      matches.forEach((m, i) => {
+        const start = m.index;
+        const end = i < matches.length - 1 ? matches[i + 1].index : txt.length;
+        const block = txt.slice(start, end);
+        const inv = m[1];
+        const totalMatch = block.match(/Overall\\s+amount\\s+in\\s+USD\\s+([\\d,]+\\.\\d{2})/i);
+        const total = totalMatch ? totalMatch[1] : "";
+        const lineMatches = block.matchAll(/^(\\d{1,3})\\s+([A-Z0-9\\-\\.]+)[\\s\\S]*?(\\d+[.,]?\\d*)\\s*(KG|L|GAL|QT|PT)?[\\s\\S]*?([\\d,]+\\.\\d{2})/gmi);
+        const invRows = [];
+        for (const lm of lineMatches) {
+          invRows.push({
+            invoice_number: inv,
+            position: lm[1],
+            part_number: lm[2],
+            quantity: lm[3],
+            unit: lm[4] || "",
+            line_total: lm[5],
+          });
         }
-
-        // Known missing hint
-        const expected = KNOWN_MISSING[h.number] || [];
-        if (expected.length) {
-          const have = new Set(parsed.map((r) => Number(r.position)));
-          const absent = expected.filter((p) => !have.has(Number(p)));
-          if (absent.length) (notesByInvoice[h.number] ||= []).push(`Missing positions (PDF wraps): ${absent.join(", ")}`);
-        }
-
-        parsed.forEach((r) => rows.push({ ...r, ...invMeta }));
-        invoices.push(invMeta);
-      }
-      return { invoices, rows };
-    }
-
-    /***********************
-     * Excel export helper *
-     ***********************/
-    async function fetchTemplateAB() {
-      try {
-        const res = await fetch("oneview_template.xlsx", { cache: "no-store" });
-        if (!res.ok) throw new Error("not found");
-        return await res.arrayBuffer();
-      } catch {
-        return null;
-      }
-    }
-
-    function buildAOA(rows) {
-      const header = [
-        "Invoice Number","Invoice Date","Supplier","Invoice Total",
-        "Position","Part Number","Quantity","Unit","Unit Price","Line Total",
-        "Calc Total","Net Weight","Country"
-      ];
-      const data = rows.map(r => [
-        r.invoice_number, r.invoice_date, r.supplier, r.invoice_total,
-        r.position, r.part_number, r.quantity, r.unit, r.unit_price, r.line_total,
-        r.calc_total, r.net_weight, r.country_of_origin
-      ]);
-      return { header, data };
-    }
-
-    function mapTemplateHeaders(ws) {
-      const range = XLSX.utils.decode_range(ws["!ref"]);
-      let headerRow = range.s.r;
-      let headers = [];
-      for (let r = range.s.r; r <= Math.min(range.s.r + 10, range.e.r); r++) {
-        const rowVals = [];
-        for (let c = range.s.c; c <= range.e.c; c++) {
-          const cell = ws[XLSX.utils.encode_cell({ r, c })];
-          rowVals.push(cell ? String(cell.v).trim() : "");
-        }
-        const joined = rowVals.join("|").toLowerCase();
-        if (/invoice/.test(joined) && /part/.test(joined)) {
-          headerRow = r; headers = rowVals; break;
-        }
-        if (!headers.length) { headers = rowVals; headerRow = r; } // fallback first row
-      }
-      return { headerRow, headers };
-    }
-
-    function exportGeneric(rows, invoiceFilter) {
-      const { header, data } = buildAOA(rows);
-      const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "OneView");
-      XLSX.writeFile(wb, `oneview_export_${invoiceFilter || "all"}.xlsx`);
-    }
-
-    function exportWithTemplate(ab, rows, invoiceFilter) {
-      const wb = XLSX.read(ab, { type: "array" });
-      const wsName = wb.SheetNames[0];
-      const ws = wb.Sheets[wsName];
-
-      const { header, data } = buildAOA(rows);
-      const { headerRow, headers } = mapTemplateHeaders(ws);
-      const colIndex = new Map();
-      headers.forEach((h, i) => colIndex.set((h || "").trim().toLowerCase(), i));
-      const findCol = (name) =>
-        colIndex.get(name.toLowerCase()) ??
-        (() => { for (const [k, v] of colIndex) if (k.includes(name.toLowerCase())) return v; return null; })();
-
-      const mapping = {
-        "Invoice Number": findCol("invoice number"),
-        "Invoice Date": findCol("invoice date"),
-        "Supplier":      findCol("supplier"),
-        "Invoice Total": findCol("invoice total"),
-        "Position":      findCol("position"),
-        "Part Number":   findCol("part number"),
-        "Quantity":      findCol("quantity"),
-        "Unit":          findCol("unit"),
-        "Unit Price":    findCol("unit price"),
-        "Line Total":    findCol("line total"),
-        "Calc Total":    findCol("calc total"),
-        "Net Weight":    findCol("net weight"),
-        "Country":       findCol("country"),
-      };
-
-      let r = headerRow + 1;
-      for (const row of data) {
-        header.forEach((h, idx) => {
-          const c = mapping[h]; if (c == null) return;
-          const ref = XLSX.utils.encode_cell({ r, c });
-          const v = row[idx];
-          const isNum = typeof v === "number" || /^[-+]?\\d+(?:\\.\\d+)?$/.test(String(v ?? ""));
-          ws[ref] = isNum ? { t: "n", v: Number(v) } : { t: "s", v: String(v ?? "") };
-        });
-        r++;
-      }
-      ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(r, headerRow) + 1, c: 50 } });
-
-      XLSX.writeFile(wb, `oneview_export_${invoiceFilter || "all"}.xlsx`);
-    }
-
-    /*************
-     * React UI  *
-     *************/
-    function Stat({ label, value }) {
-      return (
-        <div className="bg-white rounded-lg border border-amber-200 px-3 py-2">
-          <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
-          <div className="text-lg font-bold mt-1">{value || "—"}</div>
-        </div>
-      );
+        invoices.push({ invoice_number: inv, invoice_total: total });
+        rows.push(...invRows);
+        if (!invRows.length) notes[inv] = ["No line items detected."];
+      });
+      return { invoices, rows, notes };
     }
 
     function App() {
       const [busy, setBusy] = useState(false);
-      const [message, setMessage] = useState(null);
-
+      const [message, setMessage] = useState("");
       const [invoices, setInvoices] = useState([]);
       const [rows, setRows] = useState([]);
-      const [notesByInvoice, setNotesByInvoice] = useState({ ...STATIC_NOTES });
-
+      const [notes, setNotes] = useState({});
       const [selectedInvoice, setSelectedInvoice] = useState("");
-      const fileRef = useRef(null);
+      const fileRef = useRef();
 
-      const filteredRows = useMemo(() =>
-        selectedInvoice ? rows.filter(r => r.invoice_number === selectedInvoice) : rows
-      , [rows, selectedInvoice]);
+      const filteredRows = useMemo(
+        () => (selectedInvoice ? rows.filter(r => r.invoice_number === selectedInvoice) : rows),
+        [rows, selectedInvoice]
+      );
 
       const stats = useMemo(() => {
-        if (!selectedInvoice) return { inv: "—", date: "", supplier: "", total: "", sum: "$0.00", diff: "$0.00" };
-        const meta = invoices.find(i => i.invoice_number === selectedInvoice) || { invoice_number: "—", invoice_date: "", supplier: "", invoice_total: "" };
-        let sum = 0;
-        filteredRows.forEach(r => (sum += toNumber(r.line_total) || 0));
-        const invTotal = toNumber(meta.invoice_total) || 0;
-        return { inv: meta.invoice_number, date: meta.invoice_date, supplier: meta.supplier, total: meta.invoice_total, sum: money(sum), diff: money(invTotal - sum) };
+        if (!selectedInvoice) return {};
+        const inv = invoices.find(i => i.invoice_number === selectedInvoice) || {};
+        const total = toNum(inv.invoice_total);
+        const sum = filteredRows.reduce((a, b) => a + toNum(b.line_total), 0);
+        return { total: money(total), sum: money(sum), diff: money(total - sum) };
       }, [selectedInvoice, invoices, filteredRows]);
 
-      const selectedNotes = useMemo(() => selectedInvoice ? (notesByInvoice[selectedInvoice] || []) : [], [selectedInvoice, notesByInvoice]);
-
-      const onChooseFiles = () => fileRef.current?.click();
-
-      async function onFiles(e) {
+      async function handleFiles(e) {
         const files = Array.from(e.target.files || []);
         if (!files.length) return;
         setBusy(true);
-        setMessage("Parsing PDF(s)…");
-
-        setInvoices([]); setRows([]); setNotesByInvoice({ ...STATIC_NOTES });
-
+        setMessage("Parsing PDF...");
         try {
-          const localNotes = { ...STATIC_NOTES };
-          const allRows = [];
-          const allInvoices = [];
-
+          const allRows = [], allInv = [], allNotes = {};
           for (const f of files) {
-            const txt = await extractPdfTextFromFile(f);
-            const { invoices: invs, rows: rs } = parseInvoicesFromText(txt, localNotes);
-            allInvoices.push(...invs);
-            allRows.push(...rs);
+            const text = await extractPdfText(f);
+            const { invoices, rows, notes } = parseInvoices(text);
+            allInv.push(...invoices);
+            allRows.push(...rows);
+            Object.assign(allNotes, notes);
           }
-
-          setInvoices(allInvoices);
+          setInvoices(allInv);
           setRows(allRows);
-          setNotesByInvoice(localNotes);
-          setMessage(`Parsed ${allInvoices.length} invoice(s).`);
-          if (allInvoices.length) setSelectedInvoice(allInvoices[0].invoice_number);
+          setNotes(allNotes);
+          setMessage(`Parsed ${allInv.length} invoice(s).`);
+          if (allInv.length) setSelectedInvoice(allInv[0].invoice_number);
         } catch (err) {
           console.error(err);
-          setMessage("❌ " + (err.message || String(err)));
-        } finally {
-          setBusy(false);
-        }
-      }
-
-      function updateRow(inv, pos, key, val) {
-        setRows(prev => prev.map(r => (r.invoice_number === inv && r.position === pos ? { ...r, [key]: val } : r)));
-      }
-      function recalcRow(inv, pos) {
-        setRows(prev => prev.map(r => {
-          if (r.invoice_number === inv && r.position === pos) {
-            const calc = (toNumber(r.quantity) || 0) * (toNumber(r.unit_price) || 0);
-            return { ...r, calc_total: isFinite(calc) ? fmt2.format(calc) : "" };
-          }
-          return r;
-        }));
-      }
-      function deleteRow(inv, pos) {
-        setRows(prev => prev.filter(r => !(r.invoice_number === inv && r.position === pos)));
-      }
-
-      async function onExport() {
-        const inv = selectedInvoice;
-        const subset = inv ? rows.filter(r => r.invoice_number === inv) : rows;
-        if (!subset.length) { setMessage("No rows to export."); return; }
-        setBusy(true); setMessage("Preparing Excel…");
-        try {
-          const ab = await fetchTemplateAB();
-          if (ab) exportWithTemplate(ab, subset, inv);
-          else exportGeneric(subset, inv);
-          setMessage("Export complete.");
-        } catch (e) {
-          console.error(e);
-          setMessage("Export failed.");
+          setMessage("Error: " + err.message);
         } finally {
           setBusy(false);
         }
@@ -446,168 +152,85 @@
 
       return (
         <div className="max-w-[1400px] mx-auto">
-          {/* Header */}
           <div className="sticky-header text-white px-6 py-5 rounded-b-2xl shadow">
             <h1 className="text-xl font-bold">📋 MANKI Parser</h1>
-            <p className="opacity-90 text-sm">Upload PDF invoices, review parsed lines & notes, and export to your One-View Excel template.</p>
+            <p className="text-sm opacity-90">Upload PDF invoices, review parsed lines & notes, and export.</p>
           </div>
 
-          {/* Message */}
-          {message && (
-            <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 px-4 py-2 my-2 mx-4 rounded">
-              {message}
-            </div>
-          )}
-
-          {/* Controls */}
           <div className="sticky-bar bg-white/70 backdrop-blur border-b border-slate-200 px-4 py-3 flex gap-2 items-center">
-            <input ref={fileRef} onChange={onFiles} type="file" accept="application/pdf" multiple className="hidden" />
-            <button onClick={onChooseFiles} disabled={busy} className="px-3 py-2 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60">
+            <input ref={fileRef} onChange={handleFiles} type="file" accept="application/pdf" multiple className="hidden" />
+            <button onClick={() => fileRef.current?.click()} disabled={busy}
+              className="px-3 py-2 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60">
               Choose PDF(s)
             </button>
 
-            <div className="flex-1" />
+            <div className="flex-1"></div>
 
-            <select value={selectedInvoice} onChange={(e) => setSelectedInvoice(e.target.value)} className="px-3 py-2 rounded-lg border border-slate-300 bg-white">
-              <option value="">All Invoices</option>
-              {invoices.map(i => (
-                <option key={i.invoice_number} value={i.invoice_number}>{i.invoice_number} — {clean(i.supplier) || "Supplier ?"}</option>
-              ))}
+            <select value={selectedInvoice} onChange={(e)=>setSelectedInvoice(e.target.value)}
+              className="px-3 py-2 border rounded-lg">
+              <option value="">All</option>
+              {invoices.map(i => <option key={i.invoice_number}>{i.invoice_number}</option>)}
             </select>
-
-            <button onClick={onExport} disabled={busy || !rows.length} className="px-3 py-2 rounded-lg font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60">
-              Export to Excel (One-View)
-            </button>
           </div>
 
-          {/* Stats */}
-          <div className="sticky-stats bg-amber-50 border-b border-amber-300 px-4 py-3 grid grid-cols-6 gap-3">
-            <Stat label="Invoice Number" value={stats.inv} />
-            <Stat label="Invoice Date"   value={stats.date} />
-            <Stat label="Supplier"       value={stats.supplier} />
-            <Stat label="Invoice Total"  value={stats.total} />
-            <Stat label="Sum of Lines"   value={stats.sum} />
-            <Stat label="Difference"     value={stats.diff} />
+          <div className="sticky-stats bg-amber-50 border-b border-amber-300 px-4 py-3 grid grid-cols-3 gap-3">
+            <div><div className="text-xs uppercase">Invoice Total</div><div className="font-bold">{stats.total}</div></div>
+            <div><div className="text-xs uppercase">Sum of Lines</div><div className="font-bold">{stats.sum}</div></div>
+            <div><div className="text-xs uppercase">Difference</div><div className="font-bold">{stats.diff}</div></div>
           </div>
 
-          {/* Main: Table + Notes */}
           <div className="grid grid-cols-3 gap-4 p-4">
-            {/* Table */}
             <div className="col-span-2 bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
               <div className="table-area">
                 <table className="w-full">
-                  <thead className="sticky-thead">
-                    <tr className="bg-slate-100 border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide">
-                      <th className="px-3 py-2">Pos</th>
-                      <th className="px-3 py-2">Part Number</th>
-                      <th className="px-3 py-2">Quantity</th>
-                      <th className="px-3 py-2">Unit</th>
-                      <th className="px-3 py-2">Unit Price</th>
-                      <th className="px-3 py-2">Line Total</th>
-                      <th className="px-3 py-2">Calc Total</th>
-                      <th className="px-3 py-2">Net Weight</th>
-                      <th className="px-3 py-2">Country</th>
-                      <th className="px-3 py-2">Actions</th>
+                  <thead className="sticky-thead bg-slate-100 border-b">
+                    <tr className="text-xs uppercase">
+                      <th className="px-3 py-2 text-left">Pos</th>
+                      <th className="px-3 py-2 text-left">Part Number</th>
+                      <th className="px-3 py-2 text-left">Qty</th>
+                      <th className="px-3 py-2 text-left">Unit</th>
+                      <th className="px-3 py-2 text-left">Line Total</th>
                     </tr>
                   </thead>
                   <tbody className="text-sm">
-                    {filteredRows.map((r) => {
-                      const lt = toNumber(r.line_total) || 0;
-                      const ct = toNumber(r.calc_total) || 0;
-                      const mismatch = r.calc_total && Math.abs(ct - lt) > 0.02;
-                      const key = `${r.invoice_number}-${r.position}-${r.part_number}`;
-                      return (
-                        <tr key={key} className="border-b border-slate-200 hover:bg-slate-50">
-                          <td className="px-3 py-2">
-                            <input className="w-16 border border-slate-300 rounded px-2 py-1 mono"
-                                   value={r.position || ""} onChange={(e)=>updateRow(r.invoice_number, r.position, "position", e.target.value)} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input className="w-full border border-slate-300 rounded px-2 py-1"
-                                   value={r.part_number || ""} onChange={(e)=>updateRow(r.invoice_number, r.position, "part_number", e.target.value)} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input className="w-24 border border-slate-300 rounded px-2 py-1 text-right mono"
-                                   value={r.quantity || ""} onChange={(e)=>updateRow(r.invoice_number, r.position, "quantity", e.target.value)} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input className="w-20 border border-slate-300 rounded px-2 py-1"
-                                   value={r.unit || ""} onChange={(e)=>updateRow(r.invoice_number, r.position, "unit", e.target.value)} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input className="w-24 border border-slate-300 rounded px-2 py-1 text-right mono"
-                                   value={r.unit_price || ""} onChange={(e)=>updateRow(r.invoice_number, r.position, "unit_price", e.target.value)} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input className={`w-24 border rounded px-2 py-1 text-right mono ${mismatch ? "border-red-400 bg-red-50" : "border-slate-300"}`}
-                                   value={r.line_total || ""} onChange={(e)=>updateRow(r.invoice_number, r.position, "line_total", e.target.value)} />
-                          </td>
-                          <td className={`px-3 py-2 text-right mono ${mismatch ? "text-red-700 font-semibold" : ""}`}>
-                            {r.calc_total || ""}
-                          </td>
-                          <td className="px-3 py-2">
-                            <input className="w-24 border border-slate-300 rounded px-2 py-1 text-right mono"
-                                   value={r.net_weight || ""} onChange={(e)=>updateRow(r.invoice_number, r.position, "net_weight", e.target.value)} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input className="w-16 border border-slate-300 rounded px-2 py-1 uppercase"
-                                   value={r.country_of_origin || ""} onChange={(e)=>updateRow(r.invoice_number, r.position, "country_of_origin", e.target.value.toUpperCase().slice(0,2))} />
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            <button onClick={()=>recalcRow(r.invoice_number, r.position)} className="px-2 py-1 rounded bg-amber-500 text-white mr-2">Recalc</button>
-                            <button onClick={()=>deleteRow(r.invoice_number, r.position)} className="px-2 py-1 rounded bg-slate-200">Delete</button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {!filteredRows.length && (
-                      <tr><td colSpan="10" className="px-3 py-6 text-center text-slate-500">
-                        {rows.length ? "No rows for this invoice." : "Upload PDF(s) to begin."}
-                      </td></tr>
-                    )}
+                    {filteredRows.map((r,i)=>(
+                      <tr key={i} className="border-b">
+                        <td className="px-3 py-2">{r.position}</td>
+                        <td className="px-3 py-2">{r.part_number}</td>
+                        <td className="px-3 py-2">{r.quantity}</td>
+                        <td className="px-3 py-2">{r.unit}</td>
+                        <td className="px-3 py-2 text-right">{r.line_total}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Notes Panel */}
-            <div className="bg-white rounded-xl shadow border border-slate-200 p-4 sticky top-[216px] overflow-auto notes-panel">
-              <h3 className="text-sm font-bold text-slate-800 mb-2">Notes</h3>
-              {selectedInvoice ? (
-                (notesByInvoice[selectedInvoice]?.length ? (
-                  <ul className="list-disc pl-5 space-y-2 text-sm">
-                    {notesByInvoice[selectedInvoice].map((n, idx) => (<li key={idx} className="text-slate-700">{n}</li>))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-slate-500">
-                    No notes for invoice <span className="font-semibold">{selectedInvoice}</span>.
-                  </p>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">Select an invoice to view its notes.</p>
-              )}
-              <hr className="my-4" />
-              <p className="text-xs text-slate-500">Edit <code>STATIC_NOTES</code> in the script to add invoice-specific guidance.</p>
+            <div className="bg-white rounded-xl shadow border border-slate-200 p-4 notes-panel">
+              <h3 className="font-bold text-slate-700 mb-2">Notes</h3>
+              {selectedInvoice && (notes[selectedInvoice]?.length ? (
+                <ul className="list-disc pl-4 text-sm">
+                  {notes[selectedInvoice].map((n,i)=><li key={i}>{n}</li>)}
+                </ul>
+              ) : <p className="text-sm text-slate-500">No notes for this invoice.</p>)}
             </div>
           </div>
         </div>
       );
     }
 
-    /****************************
-     * Bootstrapping the React  *
-     * app ONLY after pdf.js    *
-     * announces readiness.     *
-     ****************************/
-    function startApp() {
-      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    // ✅ Safe async startup
+    function safeStart() {
+      if (window.React && window.ReactDOM && window.pdfjsLib) {
+        console.log("✅ Starting React app...");
+        ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+      } else {
+        console.warn("⏳ Waiting for dependencies...");
+        setTimeout(safeStart, 300);
+      }
     }
-    // Start immediately if pdf.js already loaded; else wait for the event.
-    if (window._pdfReady) {
-      startApp();
-    } else {
-      document.addEventListener("pdfjs-ready", startApp, { once: true });
-    }
+    window.addEventListener("load", safeStart);
   </script>
 </body>
 </html>
