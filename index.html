@@ -7,27 +7,38 @@
   <!-- XLSX (SheetJS) for exports -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- PDF.js main library -->
-  <!-- PDF.js -->
-<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.js"></script>
+       <!-- PDF.js loader for GitHub Pages -->
 <script>
-  (function () {
-    try {
-      if (window.pdfjsLib) {
-        const workerBlob = new Blob([
-          "importScripts('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.worker.min.js');"
-        ], { type: "application/javascript" });
-        const workerUrl = URL.createObjectURL(workerBlob);
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
-        console.log("✅ pdf.js initialized successfully");
-      } else {
-        console.error("⚠️ pdfjsLib not found; pdf.js failed to load.");
-      }
-    } catch (e) {
-      console.error("Failed to initialize pdf.js worker:", e);
-    }
-  })();
+(async () => {
+  try {
+    // Dynamically import pdf.js from jsDelivr (works in GitHub Pages)
+    const pdfScript = document.createElement("script");
+    pdfScript.src = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.js";
+    document.head.appendChild(pdfScript);
+
+    // Wait until it finishes loading
+    await new Promise((resolve, reject) => {
+      pdfScript.onload = resolve;
+      pdfScript.onerror = () => reject(new Error("Failed to load pdf.js"));
+    });
+
+    // Verify the global is present
+    if (!window.pdfjsLib) throw new Error("pdfjsLib not found after load");
+
+    // Create a blob worker to avoid cross-origin issues on GitHub Pages
+    const workerBlob = new Blob([
+      "importScripts('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.worker.min.js');"
+    ], { type: "application/javascript" });
+    const workerUrl = URL.createObjectURL(workerBlob);
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+
+    console.log("✅ pdf.js initialized successfully");
+  } catch (e) {
+    console.error("❌ pdf.js initialization failed:", e);
+  }
+})();
 </script>
-</script> 
+
   <style>
     /* ====== Original purple styling (polished) ====== */
     * { box-sizing: border-box; }
