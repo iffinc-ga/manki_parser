@@ -1,862 +1,589 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manki Invoice Parser - DEBUG</title>
-    
-    <!-- External Libraries -->
-    <script src="https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Invoice PDF Parser → One-View Export</title>
+  <!-- PDF.js (vanilla build) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
+  <!-- XLSX (sheetjs) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --header-h: 72px;
+      --controls-h: 64px;
+      --stats-h: 120px;
+      --sticky-offset: calc(var(--header-h) + var(--controls-h));
+      --sticky-offset-table: calc(var(--header-h) + var(--controls-h) + var(--stats-h));
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: #f6f7fb; color: #111827;
+    }
+    .container { max-width: 1600px; margin: 0 auto; }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.07); overflow: hidden; }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
+    .header { position: sticky; top: 0; z-index: 50; height: var(--header-h);
+      display: flex; align-items: center; padding: 0 24px; color: #fff;
+      background: linear-gradient(135deg,#667eea,#764ba2);
+    }
+    .header h1 { font-size: 20px; font-weight: 700; margin: 0; display: flex; gap: 10px; align-items: center; }
 
-        .container {
-            max-width: 1600px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            overflow: hidden;
-        }
+    .controls { position: sticky; top: var(--header-h); z-index: 49; height: var(--controls-h);
+      display: flex; gap: 12px; align-items: center; padding: 12px 24px; background: #f9fafb; border-bottom: 1px solid #e5e7eb;
+    }
+    .controls .spacer { flex: 1; }
+    label { font-size: 14px; color: #374151; font-weight: 600; }
+    select, input[type="text"], input[type="number"], input[type="date"], input[type="file"] {
+      border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 10px; font-size: 14px; background: #fff;
+    }
+    button { border: 0; border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
+    .btn { background: #667eea; color: #fff; }
+    .btn:hover { filter: brightness(0.95); }
+    .btn.secondary { background: #10b981; }
+    .btn.warn { background: #f59e0b; }
+    .btn.ghost { background: #eef2ff; color: #3730a3; }
 
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px 40px;
-            text-align: center;
-        }
+    .stats { position: sticky; top: calc(var(--header-h) + var(--controls-h)); z-index: 48; background: #fffbeb; border-bottom: 1px solid #fbbf24; padding: 12px 24px; display: grid; grid-template-columns: repeat(6, minmax(160px, 1fr)); gap: 12px; }
+    .stat { background: #fff; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 10px; }
+    .stat .lbl { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+    .stat .val { font-size: 20px; font-weight: 800; margin-top: 6px; }
+    .stat input { width: 100%; font-size: 16px; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; }
 
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
+    .alert { position: sticky; top: 0; z-index: 100; margin: 0; padding: 10px 24px; border: 0; border-top: 1px solid #bee3f8; border-bottom: 1px solid #bee3f8; background: #dbeafe; color: #1e40af; display: none; }
 
-        .header p {
-            opacity: 0.9;
-            font-size: 1.1em;
-        }
+    .table-wrap { height: calc(100vh - var(--header-h) - var(--controls-h) - var(--stats-h)); overflow: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 1200px; }
+    thead th { position: sticky; top: var(--sticky-offset-table); z-index: 47; background: #f3f4f6; color: #374151; font-weight: 700; font-size: 13px; text-align: left; padding: 10px 8px; border-bottom: 2px solid #e5e7eb; }
+    tbody td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
+    tr:hover td { background: #fafafa; }
+    td input { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; }
+    td input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.15); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .actions { white-space: nowrap; }
+    .error { background: #fef2f2; }
+    .badge { display:inline-block; background:#e0e7ff; color:#1e3a8a; font-weight:700; padding:2px 6px; border-radius:6px; font-size:10px; margin-left:6px; }
 
-        .badge {
-            background: rgba(255,255,255,0.2);
-            padding: 5px 15px;
-            border-radius: 20px;
-            display: inline-block;
-            margin-top: 10px;
-            font-size: 0.9em;
-        }
-
-        .main-content {
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            min-height: calc(100vh - 200px);
-        }
-
-        .sidebar {
-            background: #f8f9fa;
-            border-right: 1px solid #e9ecef;
-            padding: 30px;
-        }
-
-        .sidebar h2 {
-            color: #495057;
-            font-size: 1.2em;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #667eea;
-        }
-
-        .content-area {
-            padding: 30px 40px;
-        }
-
-        .upload-section {
-            background: white;
-            border: 2px dashed #667eea;
-            border-radius: 12px;
-            padding: 30px;
-            text-align: center;
-            margin-bottom: 20px;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .upload-section:hover {
-            background: #f8f9ff;
-            border-color: #764ba2;
-        }
-
-        .upload-section.dragover {
-            background: #e8ebff;
-            border-color: #667eea;
-            transform: scale(1.02);
-        }
-
-        .file-input {
-            display: none;
-        }
-
-        .upload-icon {
-            font-size: 3em;
-            margin-bottom: 15px;
-        }
-
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 1em;
-            cursor: pointer;
-            width: 100%;
-            margin-bottom: 10px;
-            transition: all 0.3s;
-            font-weight: 600;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-        }
-
-        .btn-success {
-            background: #28a745;
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .debug-section {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .debug-section h3 {
-            color: #495057;
-            margin-bottom: 15px;
-            font-size: 1.1em;
-        }
-
-        .debug-text {
-            background: white;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            padding: 15px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.85em;
-            max-height: 300px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-        }
-
-        .stat-label {
-            font-size: 0.9em;
-            opacity: 0.9;
-            margin-bottom: 5px;
-        }
-
-        .stat-value {
-            font-size: 1.8em;
-            font-weight: 700;
-        }
-
-        .alert {
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .alert.show {
-            display: block;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .alert-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        .alert-warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 40px;
-        }
-
-        .loading.show {
-            display: block;
-        }
-
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .table-container {
-            overflow-x: auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-top: 20px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85em;
-        }
-
-        th {
-            background: #667eea;
-            color: white;
-            padding: 12px 8px;
-            text-align: left;
-            font-weight: 600;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        td {
-            padding: 10px 8px;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        tr:hover {
-            background: #f8f9fa;
-        }
-
-        .divider {
-            height: 1px;
-            background: #e9ecef;
-            margin: 20px 0;
-        }
-
-        .copy-btn {
-            background: #6c757d;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.85em;
-            margin-top: 10px;
-        }
-
-        .copy-btn:hover {
-            background: #5a6268;
-        }
-
-        @media (max-width: 968px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-
-            .sidebar {
-                border-right: none;
-                border-bottom: 1px solid #e9ecef;
-            }
-        }
-    </style>
+    .footer { padding: 24px; color: #6b7280; text-align: center; }
+    .hidden { display: none !important; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🔍 Manki Invoice Parser - DEBUG MODE</h1>
-            <p>Debug version to see extracted text and troubleshoot parsing</p>
-            <div class="badge">⚙️ Development Version</div>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>📄 Invoice PDF Parser → One‑View Export</h1>
+      </div>
+
+      <div class="controls">
+        <div>
+          <label>Upload PDF(s): </label>
+          <input id="pdfInput" type="file" accept="application/pdf" multiple />
         </div>
-
-        <div class="main-content">
-            <div class="sidebar">
-                <h2>⚙️ Upload Invoice</h2>
-                
-                <div class="upload-section" id="uploadSection">
-                    <div class="upload-icon">📤</div>
-                    <p><strong>Click or drag PDF here</strong></p>
-                    <p style="font-size: 0.9em; color: #6c757d; margin-top: 10px;">Supports PDF files only</p>
-                    <input type="file" id="fileInput" class="file-input" accept=".pdf">
-                </div>
-
-                <button class="btn" id="parseBtn" disabled>🔍 Parse & Debug</button>
-
-                <div class="divider"></div>
-
-                <h2>⬇️ Download Debug</h2>
-                
-                <button class="btn btn-success" id="downloadTextBtn" disabled>📥 Download Extracted Text</button>
-                <button class="btn btn-success" id="downloadExcelBtn" disabled>📥 Download Excel</button>
-            </div>
-
-            <div class="content-area">
-                <div class="alert alert-success" id="successAlert"></div>
-                <div class="alert alert-error" id="errorAlert"></div>
-                <div class="alert alert-info" id="infoAlert"></div>
-                <div class="alert alert-warning" id="warningAlert"></div>
-
-                <div class="loading" id="loading">
-                    <div class="spinner"></div>
-                    <p>Processing invoice...</p>
-                </div>
-
-                <div id="debugContent" style="display: none;">
-                    <div class="stats-grid" id="statsGrid"></div>
-
-                    <div class="debug-section">
-                        <h3>📄 Extracted Text (First 5000 characters)</h3>
-                        <div class="debug-text" id="extractedText"></div>
-                        <button class="copy-btn" onclick="copyToClipboard('extractedText')">📋 Copy Text</button>
-                    </div>
-
-                    <div class="debug-section">
-                        <h3>🔍 Parsed Metadata</h3>
-                        <div class="debug-text" id="metadataDebug"></div>
-                    </div>
-
-                    <div class="debug-section" id="lineItemsSection">
-                        <h3>📊 Parsed Line Items</h3>
-                        <div class="table-container" id="lineItemsTable"></div>
-                    </div>
-                </div>
-            </div>
+        <div>
+          <label>Invoice:</label>
+          <select id="invoiceSelect"><option value="">All Invoices</option></select>
         </div>
+        <button id="btnExport" class="btn">Export to Excel (One‑View)</button>
+        <button id="btnCsv" class="btn ghost">Export CSV</button>
+        <div class="spacer"></div>
+        <button id="btnDemo" class="btn secondary" title="Loads sample text for quick testing">Load Demo Text</button>
+      </div>
+
+      <div id="alert" class="alert"></div>
+
+      <div class="stats">
+        <div class="stat"><div class="lbl">Invoice Number</div><div id="statInv" class="val">—</div></div>
+        <div class="stat"><div class="lbl">Invoice Date <span class="badge">editable</span></div><div class="val"><input id="statDate" type="text" placeholder="MM/DD/YYYY" /></div></div>
+        <div class="stat"><div class="lbl">Supplier <span class="badge">editable</span></div><div class="val"><input id="statSupplier" type="text" placeholder="Supplier name" /></div></div>
+        <div class="stat"><div class="lbl">Invoice Total <span class="badge">editable</span></div><div class="val"><input id="statTotal" type="number" step="0.01" placeholder="0.00" /></div></div>
+        <div class="stat"><div class="lbl">Sum of Lines</div><div id="statSum" class="val">$0.00</div></div>
+        <div class="stat"><div class="lbl">Difference</div><div id="statDiff" class="val">$0.00</div></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:72px">Pos</th>
+              <th style="width:140px">Part Number</th>
+              <th style="width:120px">Quantity</th>
+              <th style="width:80px">Unit</th>
+              <th style="width:120px">Unit Price</th>
+              <th style="width:120px">Line Total</th>
+              <th style="width:120px">Calc Total</th>
+              <th style="width:120px">Net Weight</th>
+              <th style="width:88px">Country</th>
+              <th style="width:220px">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="footer">Place <code>oneview_template.xlsx</code> beside this HTML in your GitHub Pages repo to export using your template.</div>
     </div>
+  </div>
 
-    <script>
-        // Configure PDF.js worker
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
+<script>
+/**********************
+ * Utilities
+ **********************/
+const $$ = (sel, root=document) => root.querySelector(sel);
+const $$$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const fmt = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function money(n){ if(n==null || isNaN(n)) return "$0.00"; return `$${fmt.format(Number(n))}`; }
+function toNumber(s){ if(s==null) return NaN; return Number(String(s).replace(/[,\s]/g, "")); }
+function clean(s){ return String(s||"").replace(/\s+/g, " ").trim(); }
+function downloadBlob(blob, filename){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000); }
+function showInfo(msg){ const el=$$('#alert'); el.textContent = msg; el.style.display = msg ? 'block' : 'none'; }
 
-        // Application state
-        let extractedFullText = '';
-        let parsedData = null;
-        let uploadedFile = null;
+/**********************
+ * Global state
+ **********************/
+let allRows = []; // normalized rows
+let invoices = []; // [{invoice_number, date, total, supplier, notes:[] }]
+let notesByInvoice = {}; // {inv: [..notes]}
+let templateArrayBuffer = null; // loaded template for export
 
-        // DOM elements
-        const fileInput = document.getElementById('fileInput');
-        const uploadSection = document.getElementById('uploadSection');
-        const parseBtn = document.getElementById('parseBtn');
-        const downloadTextBtn = document.getElementById('downloadTextBtn');
-        const downloadExcelBtn = document.getElementById('downloadExcelBtn');
-        const loading = document.getElementById('loading');
-        const successAlert = document.getElementById('successAlert');
-        const errorAlert = document.getElementById('errorAlert');
-        const infoAlert = document.getElementById('infoAlert');
-        const warningAlert = document.getElementById('warningAlert');
-        const debugContent = document.getElementById('debugContent');
-        const extractedText = document.getElementById('extractedText');
-        const metadataDebug = document.getElementById('metadataDebug');
-        const lineItemsTable = document.getElementById('lineItemsTable');
-        const statsGrid = document.getElementById('statsGrid');
+/**********************
+ * PDF ingestion
+ **********************/
+const pdfjsLib = window['pdfjs-dist/build/pdf'];
+if (pdfjsLib) { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js'; }
 
-        // Event Listeners
-        uploadSection.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', handleFileSelect);
-        parseBtn.addEventListener('click', parseInvoice);
-        downloadTextBtn.addEventListener('click', downloadText);
-        downloadExcelBtn.addEventListener('click', downloadExcel);
+async function readPdfFiles(files){
+  allRows = []; invoices = []; notesByInvoice = {};
+  for(const f of files){
+    const buf = await f.arrayBuffer();
+    const text = await extractPdfText(buf);
+    await parseInvoicesFromText(text);
+  }
+  hydrateUI();
+}
 
-        // Drag and drop
-        uploadSection.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadSection.classList.add('dragover');
-        });
+async function extractPdfText(arrayBuffer){
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let full = '';
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(it => it.str).join('\n');
+    full += pageText + '\n';
+  }
+  return full;
+}
 
-        uploadSection.addEventListener('dragleave', () => {
-            uploadSection.classList.remove('dragover');
-        });
+/**********************
+ * Parsing logic (robust to spacing/line-breaks)
+ **********************/
+const RE_INVOICE_HDR = /Customs\s+Invoice\s+(\d{6,})\s+from\s+(\d{2}\/\d{2}\/\d{4})/gi;
 
-        uploadSection.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadSection.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0 && files[0].type === 'application/pdf') {
-                fileInput.files = files;
-                handleFileSelect({ target: { files } });
-            } else {
-                showAlert('error', 'Please upload a PDF file');
-            }
-        });
+async function parseInvoicesFromText(txt){
+  // Identify invoice headers first
+  const headers = [];
+  for(const m of txt.matchAll(RE_INVOICE_HDR)){
+    headers.push({ index: m.index, number: m[1], date: m[2] });
+  }
+  if(headers.length===0){
+    // fallback: attempt generic header (some docs say "Amended customs invoice <no>")
+    const RE_AMENDED = /Amended\s+customs\s+invoice\s+(\d{6,})/gi;
+    for(const m of txt.matchAll(RE_AMENDED)){
+      headers.push({ index: m.index, number: m[1], date: '' });
+    }
+  }
 
-        function handleFileSelect(e) {
-            const file = e.target.files[0];
-            if (file) {
-                uploadedFile = file;
-                parseBtn.disabled = false;
-                showAlert('info', `File selected: ${file.name}`);
-            }
-        }
+  // Split the text around headers to create blocks per invoice
+  headers.sort((a,b)=>a.index-b.index);
+  for(let i=0;i<headers.length;i++){
+    const h = headers[i];
+    const end = (i < headers.length-1) ? headers[i+1].index : txt.length;
+    const block = txt.slice(h.index, end);
+    const supplier = findSupplier(block);
+    const total = findOverallAmount(block);
 
-        async function parseInvoice() {
-            if (!uploadedFile) return;
+    const invMeta = { invoice_number: h.number, invoice_date: h.date||'', supplier, invoice_total: total, notes: [] };
 
-            showLoading(true);
-            hideAlerts();
-            debugContent.style.display = 'none';
+    // Parse line items within the block
+    const rows = parseLines(block, invMeta);
+    if(!(h.number in notesByInvoice)) notesByInvoice[h.number] = [];
 
-            try {
-                // Extract text
-                const text = await extractTextFromPDF(uploadedFile);
-                extractedFullText = text;
-                
-                console.log('=== EXTRACTED TEXT ===');
-                console.log(text);
-                console.log('=== END TEXT ===');
+    // compute sum
+    const sum = rows.reduce((a,r)=> a + (toNumber(r.line_total)||0), 0);
+    const diff = (toNumber(total)||0) - sum;
+    if(Math.abs(diff) > 0.01){
+      notesByInvoice[h.number].push(`Sum of lines ${money(sum)} differs from invoice total ${money(total)} by ${money(diff)}`);
+    }
 
-                // Show first 5000 chars
-                extractedText.textContent = text.substring(0, 5000) + (text.length > 5000 ? '\n\n... (truncated, see console for full text)' : '');
+    allRows.push(...rows);
+    invoices.push(invMeta);
+  }
+}
 
-                // Parse invoice
-                const data = parseInvoiceText(text);
-                parsedData = data;
+function findSupplier(block){
+  // Try to find a supplier header line by known patterns
+  // Often "Rüdt Industrielacke GmbH & Co. KG" or "Norix Lackfabrik GmbH & Co. KG" in the pages
+  const SUP_RE = /(R[üu]dt\s+Industrielacke\s+GmbH\s*&\s*Co\.?\s*KG|Norix\s+Lackf\s*abrik\s+GmbH\s*&\s*Co\.?\s*KG|Finalin\s+GmbH\s*&\s*Co\.?\s*KG)/i;
+  const m = block.match(SUP_RE);
+  return m ? clean(m[1]) : '';
+}
 
-                // Show metadata
-                const metadata = {
-                    invoiceNumber: data.invoiceNumber || 'NOT FOUND',
-                    invoiceDate: data.invoiceDate || 'NOT FOUND',
-                    invoiceTotal: data.invoiceTotal || 'NOT FOUND',
-                    supplierName: data.supplierName || 'NOT FOUND',
-                    supplierMID: data.supplierMID || 'NOT FOUND',
-                    lineItemsCount: data.lineItems.length
-                };
+function findOverallAmount(block){
+  // Look for "Overall amount in USD   52,174.91"
+  const AMT_RE = /Overall\s+amount\s+in\s+USD\s+([0-9,]+\.[0-9]{2})/i;
+  const m = block.match(AMT_RE);
+  return m ? m[1] : '';
+}
 
-                metadataDebug.textContent = JSON.stringify(metadata, null, 2);
+function parseLines(block, inv){
+  // Heuristic: Start of a line item begins with a position number (2–3 digits) followed by a product code token
+  // Create chunks by splitting on position markers that begin at line starts
+  const chunks = [];
+  const lines = block.split(/\n+/);
+  for(let i=0;i<lines.length;i++){
+    const line = lines[i];
+    if(/^\s*\d{2,3}\b/.test(line)){
+      // Start of a new chunk. Gather until next position or until a large gap
+      let j=i+1; let chunk=[line];
+      while(j<lines.length && !/^\s*\d{2,3}\b/.test(lines[j])){ chunk.push(lines[j]); j++; }
+      chunks.push(chunk.join('\n'));
+      i = j-1;
+    }
+  }
 
-                // Show line items
-                if (data.lineItems.length > 0) {
-                    renderLineItemsTable(data.lineItems);
-                    showAlert('success', `✅ Successfully parsed ${data.lineItems.length} line items!`);
-                } else {
-                    lineItemsTable.innerHTML = '<p style="padding: 20px; color: #dc3545;">❌ No line items found. Check the extracted text above to see what was captured from the PDF.</p>';
-                    showAlert('warning', '⚠️ Parsed 0 line items. The PDF text may not match expected format. Review extracted text below.');
-                }
+  const out = [];
+  for(const ch of chunks){
+    const row = extractFromChunk(ch, inv);
+    if(row){ out.push(row); }
+  }
+  return out;
+}
 
-                // Update stats
-                updateStats(metadata);
+function extractFromChunk(txt, inv){
+  const notes = (notesByInvoice[inv.invoice_number] ||= []);
+  // Position
+  const mPos = txt.match(/^(\s*)(\d{2,3})\b/);
+  const position = mPos ? mPos[2] : '';
+  if(!position) notes.push('A line without a valid position was skipped.');
 
-                // Enable buttons
-                downloadTextBtn.disabled = false;
-                downloadExcelBtn.disabled = data.lineItems.length > 0;
+  // Part number: token after position
+  let part = '';
+  const afterPos = txt.replace(/^\s*\d{2,3}\s+/, '');
+  const mPart = afterPos.match(/^([A-Z0-9][A-Z0-9\.-]+)/i);
+  if(mPart) part = mPart[1]; else notes.push(`Pos ${position||'?'}: missing/odd part number.`);
 
-                debugContent.style.display = 'block';
+  // Quantity + unit pattern examples:
+  //   "20.0  tin(s)  x  2.000   KG 40.000 KG"
+  //   "3.0 tin(s) x 1.000 QT 3.000 QT"
+  // We'll prefer the total quantity + UOM at the end if present (e.g., "40.000 KG")
+  let quantity = '', unit = '';
+  const mQty2 = txt.match(/\b([0-9]+(?:\.[0-9]+)?)\s*(KG|GAL|QT|PT|FOZ|L)\b(?!\/)/i);
+  if(mQty2){ quantity = mQty2[1]; unit = mQty2[2].toUpperCase(); }
 
-            } catch (error) {
-                console.error('Parse error:', error);
-                showAlert('error', `Error parsing PDF: ${error.message}`);
-            } finally {
-                showLoading(false);
-            }
-        }
+  // Unit price: "12.72679 USD/KG"
+  let unit_price = '';
+  const mUP = txt.match(/([0-9]+\.[0-9]+)\s*USD\/(?:KG|GAL|QT|PT|FOZ|L)/i);
+  if(mUP) unit_price = mUP[1]; else notes.push(`Pos ${position||'?'}: unit price not found.`);
 
-        async function extractTextFromPDF(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            
-            let fullText = '';
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
-                
-                // Get text with more detail
-                const pageText = textContent.items.map(item => {
-                    return item.str;
-                }).join(' ');
-                
-                fullText += pageText + '\n';
-            }
-            
-            return fullText;
-        }
+  // Line total: often on same line end or next line: "Total price\s*USD\s*51161.70" or value alone
+  let line_total = '';
+  let mLT = txt.match(/Total\s+price\s+USD\s*([0-9,]+\.[0-9]{2})/i);
+  if(!mLT){ mLT = txt.match(/\b([0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2})\b(?![\s\S]*\b\d{1,3}(?:,\d{3})*\.\d{2}\b)/); }
+  if(mLT) line_total = mLT[1]; else notes.push(`Pos ${position||'?'}: line total not found.`);
 
-        function parseInvoiceText(text) {
-            // Extract invoice metadata
-            const invoiceNumber = extractInvoiceNumber(text);
-            const invoiceDate = extractInvoiceDate(text);
-            const invoiceTotal = extractInvoiceTotal(text);
-            const supplierName = extractSupplierName(text);
-            const supplierMID = generateSupplierMID(supplierName);
+  // Net weight and country
+  let net_weight = '';
+  const mNW = txt.match(/net\s+weight\s*[:\s]\s*([0-9]+(?:\.[0-9]+)?)/i);
+  if(mNW) net_weight = mNW[1]; else {
+    // try from patterns where an L/KG value is stated standalone lines above
+    const mNW2 = txt.match(/\b(\d{1,4}\.\d{3})\s*(?:L|KG)\b/);
+    if(mNW2) net_weight = mNW2[1];
+  }
 
-            // Extract line items
-            const lineItems = extractLineItems(text);
+  let country_of_origin = '';
+  const mCO = txt.match(/Country\s+of\s+origin\s*:\s*([A-Za-z ]+)/i);
+  if(mCO) country_of_origin = clean(mCO[1]).slice(0,2).toUpperCase();
 
-            return {
-                invoiceNumber,
-                invoiceDate,
-                invoiceTotal,
-                supplierName,
-                supplierMID,
-                lineItems
-            };
-        }
+  // Compute calc total
+  const calc_total = (toNumber(quantity) && toNumber(unit_price)) ? (toNumber(quantity) * toNumber(unit_price)) : NaN;
 
-        function extractInvoiceNumber(text) {
-            const patterns = [
-                /Customs\s+Invoice\s+(\d+)/i,
-                /invoice\s+(\d+)/i,
-                /Invoice\s+No\.?\s*:?\s*(\d+)/i,
-                /Invoice\s*#\s*(\d+)/i
-            ];
+  // Return normalized row (aligning to your editor fields)
+  if(!position && !part && !line_total) return null;
+  return {
+    invoice_number: inv.invoice_number,
+    invoice_date: inv.invoice_date,
+    invoice_total: inv.invoice_total,
+    supplier: inv.supplier,
+    position: position || '',
+    part_number: part || '',
+    quantity: quantity || '',
+    unit: unit || '',
+    unit_price: unit_price || '',
+    line_total: line_total || '',
+    calc_total: isNaN(calc_total) ? '' : fmt.format(calc_total),
+    net_weight: net_weight || '',
+    country_of_origin: country_of_origin || ''
+  };
+}
 
-            for (const pattern of patterns) {
-                const match = text.match(pattern);
-                if (match) {
-                    console.log('Found invoice number:', match[1]);
-                    return match[1];
-                }
-            }
-            console.log('Invoice number not found');
-            return '';
-        }
+/**********************
+ * UI rendering & binding
+ **********************/
+function hydrateUI(){
+  // Make unique list of invoices
+  const map = new Map();
+  for(const row of allRows){
+    if(!map.has(row.invoice_number)){
+      map.set(row.invoice_number, {
+        invoice_number: row.invoice_number,
+        invoice_date: row.invoice_date,
+        supplier: row.supplier,
+        invoice_total: row.invoice_total,
+      });
+    }
+  }
+  invoices = invoices.map(i => ({...i, ...(map.get(i.invoice_number)||{}) }));
 
-        function extractInvoiceDate(text) {
-            const patterns = [
-                /from\s+(\d{2}\/\d{2}\/\d{4})/,
-                /Date:\s*(\d{2}\/\d{2}\/\d{4})/,
-                /Invoice\s+Date:\s*(\d{2}\/\d{2}\/\d{4})/,
-                /(\d{2}\/\d{2}\/\d{4})/
-            ];
+  // Populate dropdown
+  const sel = $$('#invoiceSelect');
+  sel.innerHTML = '<option value="">All Invoices</option>' + invoices.map(i => `<option value="${i.invoice_number}">${i.invoice_number} — ${clean(i.supplier)||'Supplier ?'}</option>`).join('');
 
-            for (const pattern of patterns) {
-                const match = text.match(pattern);
-                if (match) {
-                    const [month, day, year] = match[1].split('/');
-                    const formatted = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                    console.log('Found invoice date:', formatted);
-                    return formatted;
-                }
-            }
-            console.log('Invoice date not found');
-            return '';
-        }
+  renderTable();
+}
 
-        function extractInvoiceTotal(text) {
-            const patterns = [
-                /Total\s+net\s+amount\s+([\d,]+\.?\d*)/i,
-                /Overall\s+amount\s+in\s+USD\s+([\d,]+\.?\d*)/i,
-                /Invoice\s+Total:\s+\$?([\d,]+\.?\d*)/i,
-                /Total:\s+\$?([\d,]+\.?\d*)/i
-            ];
+function getFilterInvoice(){ return $$('#invoiceSelect').value; }
 
-            for (const pattern of patterns) {
-                const match = text.match(pattern);
-                if (match) {
-                    const total = parseFloat(match[1].replace(/,/g, ''));
-                    console.log('Found invoice total:', total);
-                    return total;
-                }
-            }
-            console.log('Invoice total not found');
-            return 0;
-        }
+function renderTable(){
+  const invSel = getFilterInvoice();
+  const rows = invSel ? allRows.filter(r => r.invoice_number===invSel) : allRows.slice();
+  const tb = $$('#tbody'); tb.innerHTML = '';
 
-        function extractSupplierName(text) {
-            const lines = text.split('\n').slice(0, 10);
-            
-            for (const line of lines) {
-                if (line.includes('GmbH') || line.includes('Lackfabrik') || line.includes('Fabrik')) {
-                    const match = line.match(/([A-Za-z\s]+ GmbH & Co\. KG)/);
-                    if (match) {
-                        console.log('Found supplier:', match[1].trim());
-                        return match[1].trim();
-                    }
-                }
-            }
-            console.log('Supplier not found');
-            return '';
-        }
+  // Stats header fields
+  const invMeta = invoices.find(i => i.invoice_number===invSel) || { invoice_number:'—', invoice_date:'', supplier:'', invoice_total:'' };
+  $$('#statInv').textContent = invMeta.invoice_number || '—';
+  $$('#statDate').value = invMeta.invoice_date || '';
+  $$('#statSupplier').value = invMeta.supplier || '';
+  $$('#statTotal').value = invMeta.invoice_total || '';
 
-        function generateSupplierMID(supplierName) {
-            if (!supplierName) return '';
-            
-            const cleanName = supplierName
-                .replace(/GmbH/g, '')
-                .replace(/Co\./g, '')
-                .replace(/KG/g, '')
-                .replace(/,/g, '')
-                .replace(/&/g, '')
-                .trim();
-            
-            const words = cleanName.split(/\s+/);
-            let mid = 'DE';
-            
-            for (let i = 0; i < Math.min(3, words.length); i++) {
-                mid += words[i].substring(0, 3).toUpperCase();
-            }
-            
-            return mid.substring(0, 11);
-        }
+  // Notes area
+  const notes = invSel ? (notesByInvoice[invSel]||[]) : [];
+  if(notes.length){ showInfo('Notes for invoice ' + invSel + ': ' + notes.join(' • ')); } else { showInfo(''); }
 
-        function extractLineItems(text) {
-            const items = [];
-            const lines = text.split('\n');
-            
-            console.log('=== SEARCHING FOR LINE ITEMS ===');
-            console.log('Total lines:', lines.length);
-            
-            const itemPattern = /^\s*(\d+)\s+([A-Z0-9]+\.[A-Z0-9]+\.[A-Z0-9]+\.[A-Z0-9]+)/;
-            
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const itemMatch = line.match(itemPattern);
-                
-                if (itemMatch) {
-                    console.log('Found line item match at line', i, ':', line);
-                    
-                    const position = itemMatch[1];
-                    const productCodeFull = itemMatch[2];
-                    const productCode = productCodeFull.split('.')[0].substring(0, 5);
-                    
-                    // Extract quantity and unit
-                    const qtyUnitPattern = /([\d,]+\.[\d]+)\s+(KG|PC|PT|QT|GAL|CN|CAT|L)\s+([\d.]+)\s+USD/;
-                    const qtyMatch = line.match(qtyUnitPattern);
-                    
-                    let quantity = 0, unit = '', unitPrice = 0;
-                    
-                    if (qtyMatch) {
-                        quantity = parseFloat(qtyMatch[1].replace(/,/g, ''));
-                        unit = qtyMatch[2];
-                        unitPrice = parseFloat(qtyMatch[3]);
-                        console.log('  Quantity:', quantity, unit, 'Price:', unitPrice);
-                    }
-                    
-                    // Extract line total
-                    const totalPattern = /([\d,]+\.\d{2})\s*$/;
-                    const totalMatch = line.match(totalPattern);
-                    const lineTotal = totalMatch ? parseFloat(totalMatch[1].replace(/,/g, '')) : 0;
-                    console.log('  Line total:', lineTotal);
-                    
-                    // Get product name
-                    let productName = '';
-                    let netWeight = null;
-                    
-                    if (i + 1 < lines.length) {
-                        const nextLine = lines[i + 1].trim();
-                        if (nextLine && !nextLine.match(/^\d+\s+/)) {
-                            productName = nextLine;
-                            console.log('  Product name:', productName);
-                        }
-                    }
-                    
-                    // Calculate unit price if not found
-                    if (!unitPrice && quantity > 0 && lineTotal > 0) {
-                        unitPrice = lineTotal / quantity;
-                    }
-                    
-                    if (quantity && lineTotal) {
-                        items.push({
-                            position,
-                            productCode,
-                            productCodeFull,
-                            productName,
-                            quantity,
-                            unit,
-                            netWeight,
-                            unitPrice: parseFloat(unitPrice.toFixed(5)),
-                            lineTotal
-                        });
-                    }
-                }
-            }
-            
-            console.log('=== FOUND', items.length, 'LINE ITEMS ===');
-            return items;
-        }
+  // Render rows
+  let sum = 0;
+  for(const r of rows){
+    const tr = document.createElement('tr');
+    const lt = toNumber(r.line_total)||0; sum += lt;
+    tr.innerHTML = `
+      <td>${r.position||''}</td>
+      <td><input data-k="part_number" value="${r.part_number||''}"></td>
+      <td class="num"><input class="num" data-k="quantity" value="${r.quantity||''}"></td>
+      <td><input data-k="unit" value="${r.unit||''}"></td>
+      <td class="num"><input class="num" data-k="unit_price" value="${r.unit_price||''}"></td>
+      <td class="num"><input class="num" data-k="line_total" value="${r.line_total||''}"></td>
+      <td class="num ${r.calc_total && Math.abs(toNumber(r.calc_total)-lt)>0.01 ? 'error':''}">${r.calc_total||''}</td>
+      <td class="num"><input class="num" data-k="net_weight" value="${r.net_weight||''}"></td>
+      <td><input data-k="country_of_origin" value="${r.country_of_origin||''}"></td>
+      <td class="actions"><button class="btn warn" data-act="recalc">Recalc</button> <button class="btn ghost" data-act="del">Delete</button></td>
+    `;
+    // Attach data reference
+    tr.dataset.inv = r.invoice_number; tr.dataset.pos = r.position;
+    tb.appendChild(tr);
+  }
 
-        function renderLineItemsTable(items) {
-            let html = '<table><thead><tr>';
-            html += '<th>Pos</th><th>Product Code</th><th>Product Name</th><th>Qty</th>';
-            html += '<th>Unit</th><th>Unit Price</th><th>Line Total</th>';
-            html += '</tr></thead><tbody>';
+  $$('#statSum').textContent = money(sum);
+  const invTotal = toNumber(invMeta.invoice_total)||0;
+  $$('#statDiff').textContent = money(invTotal - sum);
+}
 
-            items.forEach(item => {
-                html += `<tr>
-                    <td>${item.position}</td>
-                    <td>${item.productCodeFull}</td>
-                    <td>${item.productName}</td>
-                    <td>${item.quantity}</td>
-                    <td>${item.unit}</td>
-                    <td>$${item.unitPrice.toFixed(5)}</td>
-                    <td>$${item.lineTotal.toFixed(2)}</td>
-                </tr>`;
-            });
+// Handle edits and actions
+$$('#tbody').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-act]'); if(!btn) return;
+  const tr = e.target.closest('tr'); if(!tr) return;
+  const inv = tr.dataset.inv; const pos = tr.dataset.pos;
+  const idx = allRows.findIndex(r => r.invoice_number===inv && r.position===pos);
+  if(idx<0) return;
+  const act = btn.dataset.act;
+  if(act==='recalc'){
+    const r = allRows[idx];
+    const calc = (toNumber(r.quantity)||0) * (toNumber(r.unit_price)||0);
+    r.calc_total = fmt.format(calc);
+    renderTable();
+  } else if(act==='del'){
+    allRows.splice(idx,1); renderTable();
+  }
+});
 
-            html += '</tbody></table>';
-            lineItemsTable.innerHTML = html;
-        }
+// Two-way bind inputs
+$$('#tbody').addEventListener('input', (e)=>{
+  const inp = e.target.closest('input[data-k]'); if(!inp) return;
+  const tr = e.target.closest('tr'); const inv = tr.dataset.inv; const pos = tr.dataset.pos;
+  const idx = allRows.findIndex(r => r.invoice_number===inv && r.position===pos);
+  if(idx<0) return;
+  const key = inp.dataset.k; allRows[idx][key] = inp.value;
+});
 
-        function updateStats(metadata) {
-            statsGrid.innerHTML = `
-                <div class="stat-card">
-                    <div class="stat-label">Invoice Number</div>
-                    <div class="stat-value" style="font-size: 1.3em;">${metadata.invoiceNumber}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Invoice Date</div>
-                    <div class="stat-value" style="font-size: 1.3em;">${metadata.invoiceDate}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Invoice Total</div>
-                    <div class="stat-value">$${metadata.invoiceTotal}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Line Items Found</div>
-                    <div class="stat-value">${metadata.lineItemsCount}</div>
-                </div>
-            `;
-        }
+$$('#invoiceSelect').addEventListener('change', ()=> renderTable());
 
-        function showLoading(show) {
-            loading.style.display = show ? 'block' : 'none';
-        }
+// Edit header meta
+$$('#statDate').addEventListener('input', (e)=>{
+  const inv = getFilterInvoice(); if(!inv) return;
+  const meta = invoices.find(i=>i.invoice_number===inv); if(meta){ meta.invoice_date = e.target.value; }
+  allRows.filter(r=>r.invoice_number===inv).forEach(r=> r.invoice_date = e.target.value);
+});
+$$('#statSupplier').addEventListener('input', (e)=>{
+  const inv = getFilterInvoice(); if(!inv) return;
+  const meta = invoices.find(i=>i.invoice_number===inv); if(meta){ meta.supplier = e.target.value; }
+  allRows.filter(r=>r.invoice_number===inv).forEach(r=> r.supplier = e.target.value);
+});
+$$('#statTotal').addEventListener('input', (e)=>{
+  const inv = getFilterInvoice(); if(!inv) return;
+  const meta = invoices.find(i=>i.invoice_number===inv); if(meta){ meta.invoice_total = e.target.value; }
+  allRows.filter(r=>r.invoice_number===inv).forEach(r=> r.invoice_total = e.target.value);
+  renderTable();
+});
 
-        function showAlert(type, message) {
-            hideAlerts();
-            
-            let alert;
-            if (type === 'success') alert = successAlert;
-            else if (type === 'error') alert = errorAlert;
-            else if (type === 'warning') alert = warningAlert;
-            else alert = infoAlert;
-            
-            alert.textContent = message;
-            alert.classList.add('show');
-            
-            setTimeout(() => {
-                alert.classList.remove('show');
-            }, 10000);
-        }
+/**********************
+ * Export (Template-aware)
+ **********************/
+async function ensureTemplateLoaded(){
+  if(templateArrayBuffer) return true;
+  try{
+    const res = await fetch('oneview_template.xlsx', { cache: 'no-store' });
+    if(!res.ok) throw new Error('not found');
+    templateArrayBuffer = await res.arrayBuffer();
+    return true;
+  }catch(err){
+    console.warn('Template not found, will export a generic workbook.');
+    return false;
+  }
+}
 
-        function hideAlerts() {
-            successAlert.classList.remove('show');
-            errorAlert.classList.remove('show');
-            infoAlert.classList.remove('show');
-            warningAlert.classList.remove('show');
-        }
+function buildWorksheetData(invFilter){
+  const rows = invFilter ? allRows.filter(r=>r.invoice_number===invFilter) : allRows;
+  const header = [
+    'Invoice Number','Invoice Date','Supplier','Invoice Total',
+    'Position','Part Number','Quantity','Unit','Unit Price','Line Total','Calc Total','Net Weight','Country'
+  ];
+  const data = rows.map(r => [
+    r.invoice_number, r.invoice_date, r.supplier, r.invoice_total,
+    r.position, r.part_number, r.quantity, r.unit, r.unit_price, r.line_total, r.calc_total, r.net_weight, r.country_of_origin
+  ]);
+  return { header, data };
+}
 
-        function copyToClipboard(elementId) {
-            const text = document.getElementById(elementId).textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                showAlert('success', '✅ Copied to clipboard!');
-            });
-        }
+function exportGeneric(inv){
+  const { header, data } = buildWorksheetData(inv);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'OneView');
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  downloadBlob(new Blob([out], {type:'application/octet-stream'}), `oneview_export_${inv||'all'}.xlsx`);
+}
 
-        function downloadText() {
-            const blob = new Blob([extractedFullText], { type: 'text/plain' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'extracted_text.txt';
-            link.click();
-            showAlert('success', '✅ Downloaded extracted text');
-        }
+function mapHeaders(ws){
+  // Try to find header row by scanning first 10 rows
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  let headerRow = range.s.r;
+  let headers = [];
+  for(let r=range.s.r; r<=Math.min(range.s.r+10, range.e.r); r++){
+    const rowVals = [];
+    for(let c=range.s.c; c<=range.e.c; c++){
+      const cell = ws[XLSX.utils.encode_cell({r,c})];
+      rowVals.push(cell ? String(cell.v).trim() : '');
+    }
+    // If row looks like header (contains some known columns), accept it
+    const joined = rowVals.join('|').toLowerCase();
+    if(/invoice/.test(joined) && /part/.test(joined)) { headerRow = r; headers = rowVals; break; }
+  }
+  return { headerRow, headers };
+}
 
-        function downloadExcel() {
-            if (!parsedData || parsedData.lineItems.length === 0) return;
+function exportWithTemplate(inv){
+  const wb = XLSX.read(templateArrayBuffer, { type: 'array' });
+  const wsName = wb.SheetNames[0];
+  const ws = wb.Sheets[wsName];
+  const { header, data } = buildWorksheetData(inv);
 
-            const wsData = [
-                [
-                    'InvoiceNumber', 'InvoiceDate', 'InvoiceTotal', 'SupplierMID', 'SupplierName',
-                    'Position', 'ProductCode', 'ProductCodeFull', 'ProductName', 'Quantity', 
-                    'Unit', 'UnitPrice', 'LineTotal', 'NetWeight'
-                ]
-            ];
+  const { headerRow, headers } = mapHeaders(ws);
+  const colIndex = new Map();
+  headers.forEach((h,i)=>{ colIndex.set(h.trim().toLowerCase(), i); });
 
-            parsedData.lineItems.forEach(item => {
-                wsData.push([
-                    parsedData.invoiceNumber,
-                    parsedData.invoiceDate,
-                    parsedData.invoiceTotal,
-                    parsedData.supplierMID,
-                    parsedData.supplierName,
-                    item.position,
-                    item.productCode,
-                    item.productCodeFull,
-                    item.productName,
-                    item.quantity,
-                    item.unit,
-                    item.unitPrice,
-                    item.lineTotal,
-                    item.netWeight
-                ]);
-            });
+  // Fallback mapping when template headers differ slightly
+  function findCol(name){
+    const i = colIndex.get(name.toLowerCase());
+    if(i!=null) return i;
+    // relaxed contains
+    for(const [k,v] of colIndex){ if(k.includes(name.toLowerCase())) return v; }
+    return null;
+  }
 
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.aoa_to_sheet(wsData);
-            XLSX.utils.book_append_sheet(wb, ws, 'Invoice Data');
+  const mapping = {
+    'Invoice Number': findCol('invoice number'),
+    'Invoice Date': findCol('invoice date'),
+    'Supplier': findCol('supplier'),
+    'Invoice Total': findCol('invoice total'),
+    'Position': findCol('position'),
+    'Part Number': findCol('part number'),
+    'Quantity': findCol('quantity'),
+    'Unit': findCol('unit'),
+    'Unit Price': findCol('unit price'),
+    'Line Total': findCol('line total'),
+    'Calc Total': findCol('calc total'),
+    'Net Weight': findCol('net weight'),
+    'Country': findCol('country')
+  };
 
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-            XLSX.writeFile(wb, `manki_invoice_debug_${timestamp}.xlsx`);
-            showAlert('success', '✅ Downloaded Excel file');
-        }
-    </script>
+  const startRow = headerRow + 1; // write under header
+  let r = startRow;
+  for(const row of data){
+    header.forEach((h, idx)=>{
+      const c = mapping[h]; if(c==null) return; // skip if template doesn't have it
+      const cellRef = XLSX.utils.encode_cell({ r, c });
+      ws[cellRef] = { t: 's', v: String(row[idx]??'') };
+    });
+    r++;
+  }
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(r, headerRow)+1, c: 50 } });
+
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  downloadBlob(new Blob([out], {type:'application/octet-stream'}), `oneview_export_${inv||'all'}.xlsx`);
+}
+
+$$('#btnExport').addEventListener('click', async ()=>{
+  const inv = getFilterInvoice();
+  const ok = await ensureTemplateLoaded();
+  if(ok && templateArrayBuffer){ exportWithTemplate(inv); }
+  else { exportGeneric(inv); }
+});
+
+$$('#btnCsv').addEventListener('click', ()=>{
+  const inv = getFilterInvoice();
+  const { header, data } = buildWorksheetData(inv);
+  const csv = [header.join(','), ...data.map(r=> r.map(v => '"'+String(v??'').replace(/"/g,'""')+'"').join(','))].join('\n');
+  downloadBlob(new Blob([csv], {type:'text/csv'}), `oneview_export_${inv||'all'}.csv`);
+});
+
+/**********************
+ * Demo loader (for quick testing without a PDF)
+ **********************/
+$$('#btnDemo').addEventListener('click', ()=>{
+  const sample = `Customs Invoice 90286988 from 10/01/2025\n\n20 H5390.6119.0.170 1.0 bucket (s) x 5.000   KG 5.000 KG 14.97600 USD/KG 74.88\nALEXIT-Pigment-Concentrate H53-90 ...\nTotal price USD 74.88\nCountry of origin: Germany\n\n24 14500.0000.0.511 4.0 can(s) x 1.000 PT 4.000 PT 9.54750 USD/PT 38.19\nNEXTEL-Härter / Hardener 5524 ...\nTotal price USD 38.19\nCountry of origin: Germany\n\nOverall amount in USD 130,408.94`;
+  allRows = []; invoices = []; notesByInvoice = {};
+  parseInvoicesFromText(sample).then(()=> hydrateUI());
+});
+
+/**********************
+ * File input binding
+ **********************/
+$$('#pdfInput').addEventListener('change', (e)=>{
+  const files = Array.from(e.target.files||[]);
+  if(!files.length) return;
+  readPdfFiles(files);
+});
+
+</script>
 </body>
 </html>
