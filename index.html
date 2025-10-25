@@ -16,42 +16,40 @@
   <!-- SheetJS for Excel -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <!-- ✅ pdf.js (UMD) with reliable initialization loop -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
+  <!-- ✅ pdf.js (UMD) with guaranteed onload initialization -->
+  <script
+    id="pdfjs-loader"
+    src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js">
+  </script>
   <script>
-    (function waitForPdf() {
+    document.getElementById("pdfjs-loader").addEventListener("load", function () {
       if (window.pdfjsLib) {
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js";
-        console.log("✅ pdf.js initialized successfully (CDN + worker)");
+        console.log("✅ pdf.js fully loaded and worker configured");
       } else {
-        console.warn("⏳ Waiting for pdf.js to become available...");
-        setTimeout(waitForPdf, 200);
+        console.error("❌ pdf.js did not expose window.pdfjsLib");
       }
-    })();
+    });
   </script>
 
   <style>
     .sticky-header { position: sticky; top: 0; z-index: 40;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
     }
     .sticky-bar { position: sticky; top: 76px; z-index: 30; }
-    .sticky-stats { position: sticky; top: 128px; z-index: 20; }
-    .sticky-thead { position: sticky; top: 216px; z-index: 10; }
-    .table-area {
-      height: calc(100vh - 76px - 52px - 88px);
-      overflow: auto;
-    }
+    .sticky-thead { position: sticky; top: 148px; z-index: 10; }
+    .table-area { height: calc(100vh - 148px - 64px); overflow: auto; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useMemo, useRef } = React;
+    const { useState, useRef } = React;
 
     // ------------------------------
-    // Hard-coded notes (edit freely)
+    // Hard-coded notes (editable)
     // ------------------------------
     const STATIC_NOTES = {
       "2563397": ["Check totals — manual verification needed"]
@@ -67,7 +65,7 @@
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
-        text += content.items.map(i => i.str).join("\\n") + "\\n";
+        text += content.items.map(i => i.str).join("\n") + "\n";
       }
       return text;
     }
@@ -83,15 +81,13 @@
     }
 
     // ------------------------------
-    // Main React App
+    // React App
     // ------------------------------
     function App() {
       const [busy, setBusy] = useState(false);
       const [rows, setRows] = useState([]);
       const [message, setMessage] = useState(null);
-      const [notes, setNotes] = useState(STATIC_NOTES);
       const [selectedInvoice, setSelectedInvoice] = useState("");
-
       const fileRef = useRef(null);
 
       async function handleFiles(e) {
@@ -104,9 +100,8 @@
           for (const f of files) {
             const txt = await extractPdfText(f);
             console.log("✅ Parsed text length:", txt.length);
-            // Simple demo parsing:
-            const invoice = (txt.match(/Invoice\\s+(\\d+)/i) || [])[1] || "Unknown";
-            const total = (txt.match(/Overall\\s+amount\\s+in\\s+USD\\s+([\\d,.]+)/i) || [])[1] || "";
+            const invoice = (txt.match(/Invoice\s+(\d+)/i) || [])[1] || "Unknown";
+            const total = (txt.match(/Overall\s+amount\s+in\s+USD\s+([\d,.]+)/i) || [])[1] || "";
             allRows.push({ file: f.name, invoice, total });
           }
           setRows(allRows);
@@ -201,15 +196,13 @@
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow border border-slate-200 p-4 h-[calc(100vh-216px-16px)] sticky top-[216px] overflow-auto">
+            <div className="bg-white rounded-xl shadow border border-slate-200 p-4 h-[calc(100vh-200px)] sticky top-[148px] overflow-auto">
               <h3 className="text-sm font-bold text-slate-800 mb-2">Notes</h3>
               {selectedInvoice ? (
-                notes[selectedInvoice]?.length ? (
+                STATIC_NOTES[selectedInvoice]?.length ? (
                   <ul className="list-disc pl-5 space-y-2 text-sm">
-                    {notes[selectedInvoice].map((n, idx) => (
-                      <li key={idx} className="text-slate-700">
-                        {n}
-                      </li>
+                    {STATIC_NOTES[selectedInvoice].map((n, idx) => (
+                      <li key={idx} className="text-slate-700">{n}</li>
                     ))}
                   </ul>
                 ) : (
