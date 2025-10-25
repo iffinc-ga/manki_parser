@@ -3,10 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Invoice PDF Parser → One-View Export</title>
-  <!-- PDF.js (vanilla build) -->
+  <title>MANKI Parser → One‑View Export</title>
+  <!-- Embed a tiny inline worker so GitHub Pages doesn't block pdf.js -->
+  <script>
+    // Inline worker for pdf.js (works on GitHub Pages without extra files)
+    const pdfWorkerSrc = URL.createObjectURL(new Blob([
+      `importScripts('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js');`
+    ], { type: 'application/javascript' }));
+  </script>
+  <!-- Main PDF.js library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
-  <!-- XLSX (sheetjs) -->
+  <!-- XLSX (SheetJS) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     :root {
@@ -27,7 +34,7 @@
 
     .header { position: sticky; top: 0; z-index: 50; height: var(--header-h);
       display: flex; align-items: center; padding: 0 24px; color: #fff;
-      background: linear-gradient(135deg,#667eea,#764ba2);
+      background: linear-gradient(135deg,#0ea5e9,#2563eb);
     }
     .header h1 { font-size: 20px; font-weight: 700; margin: 0; display: flex; gap: 10px; align-items: center; }
 
@@ -40,11 +47,11 @@
       border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 10px; font-size: 14px; background: #fff;
     }
     button { border: 0; border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
-    .btn { background: #667eea; color: #fff; }
+    .btn { background: #2563eb; color: #fff; }
     .btn:hover { filter: brightness(0.95); }
     .btn.secondary { background: #10b981; }
     .btn.warn { background: #f59e0b; }
-    .btn.ghost { background: #eef2ff; color: #3730a3; }
+    .btn.ghost { background: #eef2ff; color: #1e3a8a; }
 
     .stats { position: sticky; top: calc(var(--header-h) + var(--controls-h)); z-index: 48; background: #fffbeb; border-bottom: 1px solid #fbbf24; padding: 12px 24px; display: grid; grid-template-columns: repeat(6, minmax(160px, 1fr)); gap: 12px; }
     .stat { background: #fff; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 10px; }
@@ -60,7 +67,7 @@
     tbody td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
     tr:hover td { background: #fafafa; }
     td input { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; }
-    td input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.15); }
+    td input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     .actions { white-space: nowrap; }
     .error { background: #fef2f2; }
@@ -74,14 +81,15 @@
   <div class="container">
     <div class="card">
       <div class="header">
-        <h1>📄 Invoice PDF Parser → One‑View Export</h1>
+        <h1>📄 MANKI Parser → One‑View Export</h1>
       </div>
 
       <div class="controls">
         <div>
-          <label>Upload PDF(s): </label>
+          <label>Choose PDF(s): </label>
           <input id="pdfInput" type="file" accept="application/pdf" multiple />
         </div>
+        <button id="btnParse" class="btn">Parse PDF</button>
         <div>
           <label>Invoice:</label>
           <select id="invoiceSelect"><option value="">All Invoices</option></select>
@@ -89,7 +97,7 @@
         <button id="btnExport" class="btn">Export to Excel (One‑View)</button>
         <button id="btnCsv" class="btn ghost">Export CSV</button>
         <div class="spacer"></div>
-        <button id="btnDemo" class="btn secondary" title="Loads sample text for quick testing">Load Demo Text</button>
+        <button id="btnDemo" class="btn secondary" title="Loads sample text for quick testing">Load Demo</button>
       </div>
 
       <div id="alert" class="alert"></div>
@@ -147,21 +155,32 @@ let allRows = []; // normalized rows
 let invoices = []; // [{invoice_number, date, total, supplier, notes:[] }]
 let notesByInvoice = {}; // {inv: [..notes]}
 let templateArrayBuffer = null; // loaded template for export
+let lastChosenFiles = [];
 
 /**********************
  * PDF ingestion
  **********************/
 const pdfjsLib = window['pdfjs-dist/build/pdf'];
-if (pdfjsLib) { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js'; }
+if (pdfjsLib) { pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc; }
+
+async function onParseClicked(){
+  const files = Array.from($$('#pdfInput').files||[]);
+  if(!files.length){ showInfo('Please choose one or more PDF files.'); return; }
+  lastChosenFiles = files; await readPdfFiles(files);
+}
 
 async function readPdfFiles(files){
+  showInfo('Parsing…');
   allRows = []; invoices = []; notesByInvoice = {};
   for(const f of files){
-    const buf = await f.arrayBuffer();
-    const text = await extractPdfText(buf);
-    await parseInvoicesFromText(text);
+    try{
+      const buf = await f.arrayBuffer();
+      const text = await extractPdfText(buf);
+      await parseInvoicesFromText(text);
+    }catch(err){ console.error(err); showInfo('Error reading '+f.name+': '+err.message); }
   }
   hydrateUI();
+  showInfo('Parsed '+invoices.length+' invoice(s). Use the dropdown to view notes.');
 }
 
 async function extractPdfText(arrayBuffer){
@@ -180,6 +199,7 @@ async function extractPdfText(arrayBuffer){
  * Parsing logic (robust to spacing/line-breaks)
  **********************/
 const RE_INVOICE_HDR = /Customs\s+Invoice\s+(\d{6,})\s+from\s+(\d{2}\/\d{2}\/\d{4})/gi;
+const RE_AMENDED = /Amended\s+customs\s+invoice\s+(\d{6,})/gi;
 
 async function parseInvoicesFromText(txt){
   // Identify invoice headers first
@@ -187,15 +207,16 @@ async function parseInvoicesFromText(txt){
   for(const m of txt.matchAll(RE_INVOICE_HDR)){
     headers.push({ index: m.index, number: m[1], date: m[2] });
   }
-  if(headers.length===0){
-    // fallback: attempt generic header (some docs say "Amended customs invoice <no>")
-    const RE_AMENDED = /Amended\s+customs\s+invoice\s+(\d{6,})/gi;
-    for(const m of txt.matchAll(RE_AMENDED)){
-      headers.push({ index: m.index, number: m[1], date: '' });
-    }
+  for(const m of txt.matchAll(RE_AMENDED)){
+    // add if not already present
+    if(!headers.some(h=>h.number===m[1])) headers.push({ index: m.index, number: m[1], date: '' });
+  }
+  if(!headers.length){
+    // last resort: try a simpler anchor
+    const m = txt.match(/Invoice\s+(\d{6,})/i);
+    if(m) headers.push({ index: 0, number: m[1], date: '' });
   }
 
-  // Split the text around headers to create blocks per invoice
   headers.sort((a,b)=>a.index-b.index);
   for(let i=0;i<headers.length;i++){
     const h = headers[i];
@@ -210,12 +231,15 @@ async function parseInvoicesFromText(txt){
     const rows = parseLines(block, invMeta);
     if(!(h.number in notesByInvoice)) notesByInvoice[h.number] = [];
 
-    // compute sum
+    // compute sum and note differences
     const sum = rows.reduce((a,r)=> a + (toNumber(r.line_total)||0), 0);
     const diff = (toNumber(total)||0) - sum;
-    if(Math.abs(diff) > 0.01){
+    if(toNumber(total) && Math.abs(diff) > 0.01){
       notesByInvoice[h.number].push(`Sum of lines ${money(sum)} differs from invoice total ${money(total)} by ${money(diff)}`);
     }
+
+    // Known gaps from your PDFs (helps users correct quickly)
+    detectKnownMissing(h.number, rows);
 
     allRows.push(...rows);
     invoices.push(invMeta);
@@ -223,29 +247,23 @@ async function parseInvoicesFromText(txt){
 }
 
 function findSupplier(block){
-  // Try to find a supplier header line by known patterns
-  // Often "Rüdt Industrielacke GmbH & Co. KG" or "Norix Lackfabrik GmbH & Co. KG" in the pages
   const SUP_RE = /(R[üu]dt\s+Industrielacke\s+GmbH\s*&\s*Co\.?\s*KG|Norix\s+Lackf\s*abrik\s+GmbH\s*&\s*Co\.?\s*KG|Finalin\s+GmbH\s*&\s*Co\.?\s*KG)/i;
   const m = block.match(SUP_RE);
   return m ? clean(m[1]) : '';
 }
 
 function findOverallAmount(block){
-  // Look for "Overall amount in USD   52,174.91"
   const AMT_RE = /Overall\s+amount\s+in\s+USD\s+([0-9,]+\.[0-9]{2})/i;
   const m = block.match(AMT_RE);
   return m ? m[1] : '';
 }
 
 function parseLines(block, inv){
-  // Heuristic: Start of a line item begins with a position number (2–3 digits) followed by a product code token
-  // Create chunks by splitting on position markers that begin at line starts
   const chunks = [];
   const lines = block.split(/\n+/);
   for(let i=0;i<lines.length;i++){
     const line = lines[i];
     if(/^\s*\d{2,3}\b/.test(line)){
-      // Start of a new chunk. Gather until next position or until a large gap
       let j=i+1; let chunk=[line];
       while(j<lines.length && !/^\s*\d{2,3}\b/.test(lines[j])){ chunk.push(lines[j]); j++; }
       chunks.push(chunk.join('\n'));
@@ -263,53 +281,38 @@ function parseLines(block, inv){
 
 function extractFromChunk(txt, inv){
   const notes = (notesByInvoice[inv.invoice_number] ||= []);
-  // Position
   const mPos = txt.match(/^(\s*)(\d{2,3})\b/);
   const position = mPos ? mPos[2] : '';
   if(!position) notes.push('A line without a valid position was skipped.');
 
-  // Part number: token after position
   let part = '';
   const afterPos = txt.replace(/^\s*\d{2,3}\s+/, '');
   const mPart = afterPos.match(/^([A-Z0-9][A-Z0-9\.-]+)/i);
   if(mPart) part = mPart[1]; else notes.push(`Pos ${position||'?'}: missing/odd part number.`);
 
-  // Quantity + unit pattern examples:
-  //   "20.0  tin(s)  x  2.000   KG 40.000 KG"
-  //   "3.0 tin(s) x 1.000 QT 3.000 QT"
-  // We'll prefer the total quantity + UOM at the end if present (e.g., "40.000 KG")
   let quantity = '', unit = '';
   const mQty2 = txt.match(/\b([0-9]+(?:\.[0-9]+)?)\s*(KG|GAL|QT|PT|FOZ|L)\b(?!\/)/i);
   if(mQty2){ quantity = mQty2[1]; unit = mQty2[2].toUpperCase(); }
 
-  // Unit price: "12.72679 USD/KG"
   let unit_price = '';
   const mUP = txt.match(/([0-9]+\.[0-9]+)\s*USD\/(?:KG|GAL|QT|PT|FOZ|L)/i);
   if(mUP) unit_price = mUP[1]; else notes.push(`Pos ${position||'?'}: unit price not found.`);
 
-  // Line total: often on same line end or next line: "Total price\s*USD\s*51161.70" or value alone
   let line_total = '';
   let mLT = txt.match(/Total\s+price\s+USD\s*([0-9,]+\.[0-9]{2})/i);
   if(!mLT){ mLT = txt.match(/\b([0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2})\b(?![\s\S]*\b\d{1,3}(?:,\d{3})*\.\d{2}\b)/); }
   if(mLT) line_total = mLT[1]; else notes.push(`Pos ${position||'?'}: line total not found.`);
 
-  // Net weight and country
   let net_weight = '';
   const mNW = txt.match(/net\s+weight\s*[:\s]\s*([0-9]+(?:\.[0-9]+)?)/i);
-  if(mNW) net_weight = mNW[1]; else {
-    // try from patterns where an L/KG value is stated standalone lines above
-    const mNW2 = txt.match(/\b(\d{1,4}\.\d{3})\s*(?:L|KG)\b/);
-    if(mNW2) net_weight = mNW2[1];
-  }
+  if(mNW) net_weight = mNW[1];
 
   let country_of_origin = '';
   const mCO = txt.match(/Country\s+of\s+origin\s*:\s*([A-Za-z ]+)/i);
   if(mCO) country_of_origin = clean(mCO[1]).slice(0,2).toUpperCase();
 
-  // Compute calc total
   const calc_total = (toNumber(quantity) && toNumber(unit_price)) ? (toNumber(quantity) * toNumber(unit_price)) : NaN;
 
-  // Return normalized row (aligning to your editor fields)
   if(!position && !part && !line_total) return null;
   return {
     invoice_number: inv.invoice_number,
@@ -328,11 +331,29 @@ function extractFromChunk(txt, inv){
   };
 }
 
+function detectKnownMissing(invNumber, rows){
+  // Based on your notes: positions that often fail due to PDF line wraps
+  const knownMissing = {
+    '90286504': [],
+    '90286988': [26, 28, 67],
+    '90286989': [31],
+    '90286990': [],
+    '90286991': [],
+    '90286992': [10],
+    '90286993': []
+  };
+  const miss = knownMissing[invNumber] || [];
+  if(!miss.length) return;
+  const present = new Set(rows.map(r=>Number(r.position))); const absent = miss.filter(p=>!present.has(Number(p)));
+  if(absent.length){
+    (notesByInvoice[invNumber] ||= []).push('Missing positions (from PDF wraps): '+absent.join(', '));
+  }
+}
+
 /**********************
  * UI rendering & binding
  **********************/
 function hydrateUI(){
-  // Make unique list of invoices
   const map = new Map();
   for(const row of allRows){
     if(!map.has(row.invoice_number)){
@@ -346,7 +367,6 @@ function hydrateUI(){
   }
   invoices = invoices.map(i => ({...i, ...(map.get(i.invoice_number)||{}) }));
 
-  // Populate dropdown
   const sel = $$('#invoiceSelect');
   sel.innerHTML = '<option value="">All Invoices</option>' + invoices.map(i => `<option value="${i.invoice_number}">${i.invoice_number} — ${clean(i.supplier)||'Supplier ?'}</option>`).join('');
 
@@ -360,18 +380,15 @@ function renderTable(){
   const rows = invSel ? allRows.filter(r => r.invoice_number===invSel) : allRows.slice();
   const tb = $$('#tbody'); tb.innerHTML = '';
 
-  // Stats header fields
   const invMeta = invoices.find(i => i.invoice_number===invSel) || { invoice_number:'—', invoice_date:'', supplier:'', invoice_total:'' };
   $$('#statInv').textContent = invMeta.invoice_number || '—';
   $$('#statDate').value = invMeta.invoice_date || '';
   $$('#statSupplier').value = invMeta.supplier || '';
   $$('#statTotal').value = invMeta.invoice_total || '';
 
-  // Notes area
   const notes = invSel ? (notesByInvoice[invSel]||[]) : [];
   if(notes.length){ showInfo('Notes for invoice ' + invSel + ': ' + notes.join(' • ')); } else { showInfo(''); }
 
-  // Render rows
   let sum = 0;
   for(const r of rows){
     const tr = document.createElement('tr');
@@ -388,7 +405,6 @@ function renderTable(){
       <td><input data-k="country_of_origin" value="${r.country_of_origin||''}"></td>
       <td class="actions"><button class="btn warn" data-act="recalc">Recalc</button> <button class="btn ghost" data-act="del">Delete</button></td>
     `;
-    // Attach data reference
     tr.dataset.inv = r.invoice_number; tr.dataset.pos = r.position;
     tb.appendChild(tr);
   }
@@ -398,7 +414,7 @@ function renderTable(){
   $$('#statDiff').textContent = money(invTotal - sum);
 }
 
-// Handle edits and actions
+// table actions
 $$('#tbody').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-act]'); if(!btn) return;
   const tr = e.target.closest('tr'); if(!tr) return;
@@ -416,7 +432,7 @@ $$('#tbody').addEventListener('click', (e)=>{
   }
 });
 
-// Two-way bind inputs
+// two-way bind
 $$('#tbody').addEventListener('input', (e)=>{
   const inp = e.target.closest('input[data-k]'); if(!inp) return;
   const tr = e.target.closest('tr'); const inv = tr.dataset.inv; const pos = tr.dataset.pos;
@@ -427,7 +443,7 @@ $$('#tbody').addEventListener('input', (e)=>{
 
 $$('#invoiceSelect').addEventListener('change', ()=> renderTable());
 
-// Edit header meta
+// edit header meta
 $$('#statDate').addEventListener('input', (e)=>{
   const inv = getFilterInvoice(); if(!inv) return;
   const meta = invoices.find(i=>i.invoice_number===inv); if(meta){ meta.invoice_date = e.target.value; }
@@ -456,7 +472,7 @@ async function ensureTemplateLoaded(){
     templateArrayBuffer = await res.arrayBuffer();
     return true;
   }catch(err){
-    console.warn('Template not found, will export a generic workbook.');
+    console.warn('Template not found, exporting a generic workbook.');
     return false;
   }
 }
@@ -484,7 +500,6 @@ function exportGeneric(inv){
 }
 
 function mapHeaders(ws){
-  // Try to find header row by scanning first 10 rows
   const range = XLSX.utils.decode_range(ws['!ref']);
   let headerRow = range.s.r;
   let headers = [];
@@ -494,7 +509,6 @@ function mapHeaders(ws){
       const cell = ws[XLSX.utils.encode_cell({r,c})];
       rowVals.push(cell ? String(cell.v).trim() : '');
     }
-    // If row looks like header (contains some known columns), accept it
     const joined = rowVals.join('|').toLowerCase();
     if(/invoice/.test(joined) && /part/.test(joined)) { headerRow = r; headers = rowVals; break; }
   }
@@ -511,11 +525,9 @@ function exportWithTemplate(inv){
   const colIndex = new Map();
   headers.forEach((h,i)=>{ colIndex.set(h.trim().toLowerCase(), i); });
 
-  // Fallback mapping when template headers differ slightly
   function findCol(name){
     const i = colIndex.get(name.toLowerCase());
     if(i!=null) return i;
-    // relaxed contains
     for(const [k,v] of colIndex){ if(k.includes(name.toLowerCase())) return v; }
     return null;
   }
@@ -540,9 +552,11 @@ function exportWithTemplate(inv){
   let r = startRow;
   for(const row of data){
     header.forEach((h, idx)=>{
-      const c = mapping[h]; if(c==null) return; // skip if template doesn't have it
+      const c = mapping[h]; if(c==null) return;
       const cellRef = XLSX.utils.encode_cell({ r, c });
-      ws[cellRef] = { t: 's', v: String(row[idx]??'') };
+      const v = row[idx];
+      const isNum = typeof v === 'number' || /^-?\d+(?:\.\d+)?$/.test(String(v));
+      ws[cellRef] = isNum ? { t: 'n', v: Number(v) } : { t: 's', v: String(v??'') };
     });
     r++;
   }
@@ -567,7 +581,7 @@ $$('#btnCsv').addEventListener('click', ()=>{
 });
 
 /**********************
- * Demo loader (for quick testing without a PDF)
+ * Demo loader
  **********************/
 $$('#btnDemo').addEventListener('click', ()=>{
   const sample = `Customs Invoice 90286988 from 10/01/2025\n\n20 H5390.6119.0.170 1.0 bucket (s) x 5.000   KG 5.000 KG 14.97600 USD/KG 74.88\nALEXIT-Pigment-Concentrate H53-90 ...\nTotal price USD 74.88\nCountry of origin: Germany\n\n24 14500.0000.0.511 4.0 can(s) x 1.000 PT 4.000 PT 9.54750 USD/PT 38.19\nNEXTEL-Härter / Hardener 5524 ...\nTotal price USD 38.19\nCountry of origin: Germany\n\nOverall amount in USD 130,408.94`;
@@ -576,14 +590,9 @@ $$('#btnDemo').addEventListener('click', ()=>{
 });
 
 /**********************
- * File input binding
+ * File input & parse button
  **********************/
-$$('#pdfInput').addEventListener('change', (e)=>{
-  const files = Array.from(e.target.files||[]);
-  if(!files.length) return;
-  readPdfFiles(files);
-});
-
+$$('#btnParse').addEventListener('click', onParseClicked);
 </script>
 </body>
 </html>
