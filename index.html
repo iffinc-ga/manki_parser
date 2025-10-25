@@ -1,114 +1,109 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MANKI Parser → One‑View Export</title>
-  <!-- Embed a tiny inline worker so GitHub Pages doesn't block pdf.js -->
-  <script>
-    // Inline worker for pdf.js (works on GitHub Pages without extra files)
-    const pdfWorkerSrc = URL.createObjectURL(new Blob([
-      `importScripts('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js');`
-    ], { type: 'application/javascript' }));
-  </script>
-  <!-- Main PDF.js library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
-  <!-- XLSX (SheetJS) -->
+  <!-- XLSX (SheetJS) for exports -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- PDF.js main library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
+  <!-- Inline pdf.js worker for GitHub Pages (fixes getDocument undefined / cross‑origin worker) -->
+  <script>
+    (function(){
+      try {
+        window.pdfjsLib = window['pdfjs-dist/build/pdf'];
+        const workerBlob = new Blob([
+          "importScripts('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js');"
+        ], { type: 'application/javascript' });
+        const workerUrl = URL.createObjectURL(workerBlob);
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+      } catch(e) {
+        console.error('Failed to initialize pdf.js worker', e);
+      }
+    })();
+  </script>
   <style>
-    :root {
-      --header-h: 72px;
-      --controls-h: 64px;
-      --stats-h: 120px;
-      --sticky-offset: calc(var(--header-h) + var(--controls-h));
-      --sticky-offset-table: calc(var(--header-h) + var(--controls-h) + var(--stats-h));
-    }
+    /* ====== Original purple styling (polished) ====== */
     * { box-sizing: border-box; }
     html, body { height: 100%; }
-    body {
-      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-      background: #f6f7fb; color: #111827;
-    }
+    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; }
+
     .container { max-width: 1600px; margin: 0 auto; }
-    .card { background: #fff; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.07); overflow: hidden; }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 20px rgba(0,0,0,.08); overflow: hidden; }
 
-    .header { position: sticky; top: 0; z-index: 50; height: var(--header-h);
-      display: flex; align-items: center; padding: 0 24px; color: #fff;
-      background: linear-gradient(135deg,#0ea5e9,#2563eb);
-    }
-    .header h1 { font-size: 20px; font-weight: 700; margin: 0; display: flex; gap: 10px; align-items: center; }
+    .header { position: sticky; top: 0; z-index: 100; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 28px 30px; }
+    .header h1 { margin: 0 0 6px; font-size: 22px; }
+    .header p { margin: 0; opacity: .95; }
 
-    .controls { position: sticky; top: var(--header-h); z-index: 49; height: var(--controls-h);
-      display: flex; gap: 12px; align-items: center; padding: 12px 24px; background: #f9fafb; border-bottom: 1px solid #e5e7eb;
+    .controls { position: sticky; top: 76px; z-index: 90; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: #f9fafb; border-bottom: 1px solid #e5e7eb; padding: 14px 20px; }
+    .controls label { font-weight: 600; color: #374151; }
+    .controls input[type="file"], .controls select, .controls input[type="text"], .controls input[type="number"] {
+      padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; font-size: 14px;
     }
     .controls .spacer { flex: 1; }
-    label { font-size: 14px; color: #374151; font-weight: 600; }
-    select, input[type="text"], input[type="number"], input[type="date"], input[type="file"] {
-      border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 10px; font-size: 14px; background: #fff;
-    }
-    button { border: 0; border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
-    .btn { background: #2563eb; color: #fff; }
-    .btn:hover { filter: brightness(0.95); }
-    .btn.secondary { background: #10b981; }
-    .btn.warn { background: #f59e0b; }
-    .btn.ghost { background: #eef2ff; color: #1e3a8a; }
+    .btn { border: none; border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
+    .btn.primary { background: #667eea; color: #fff; }
+    .btn.primary:hover { filter: brightness(.95); }
+    .btn.success { background: #10b981; color: #fff; }
+    .btn.ghost { background: #eef2ff; color: #3730a3; }
+    .btn.warn { background: #f59e0b; color: #fff; }
 
-    .stats { position: sticky; top: calc(var(--header-h) + var(--controls-h)); z-index: 48; background: #fffbeb; border-bottom: 1px solid #fbbf24; padding: 12px 24px; display: grid; grid-template-columns: repeat(6, minmax(160px, 1fr)); gap: 12px; }
-    .stat { background: #fff; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 10px; }
-    .stat .lbl { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
-    .stat .val { font-size: 20px; font-weight: 800; margin-top: 6px; }
-    .stat input { width: 100%; font-size: 16px; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; }
+    .alert { position: sticky; top: 0; z-index: 110; margin: 0; padding: 12px 20px; background: #dbeafe; color: #1e40af; border-top: 1px solid #bfdbfe; border-bottom: 1px solid #bfdbfe; display: none; }
 
-    .alert { position: sticky; top: 0; z-index: 100; margin: 0; padding: 10px 24px; border: 0; border-top: 1px solid #bee3f8; border-bottom: 1px solid #bee3f8; background: #dbeafe; color: #1e40af; display: none; }
+    .stats { position: sticky; top: 130px; z-index: 80; display: grid; grid-template-columns: repeat(6, minmax(180px, 1fr)); gap: 12px; background: #fef3c7; border-bottom: 1px solid #fbbf24; padding: 12px 20px; }
+    .stat { background: #fff; border-radius: 10px; border-left: 4px solid #f59e0b; padding: 12px; }
+    .stat .label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+    .stat .value { margin-top: 6px; font-size: 20px; font-weight: 800; }
+    .stat input { width: 100%; font-size: 16px; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; }
+    .badge { display:inline-block; background:#dbeafe; color:#1e40af; font-weight:700; padding:2px 6px; border-radius:6px; font-size:10px; margin-left:6px; }
 
-    .table-wrap { height: calc(100vh - var(--header-h) - var(--controls-h) - var(--stats-h)); overflow: auto; }
+    .table-wrap { height: calc(100vh - 76px - 56px - 136px); overflow: auto; }
     table { width: 100%; border-collapse: collapse; min-width: 1200px; }
-    thead th { position: sticky; top: var(--sticky-offset-table); z-index: 47; background: #f3f4f6; color: #374151; font-weight: 700; font-size: 13px; text-align: left; padding: 10px 8px; border-bottom: 2px solid #e5e7eb; }
+    thead th { position: sticky; top: 266px; z-index: 75; background: #f3f4f6; color: #374151; font-weight: 700; font-size: 13px; text-align: left; padding: 10px 8px; border-bottom: 2px solid #e5e7eb; }
     tbody td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
     tr:hover td { background: #fafafa; }
     td input { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; }
-    td input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+    td input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.2); }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
-    .actions { white-space: nowrap; }
     .error { background: #fef2f2; }
-    .badge { display:inline-block; background:#e0e7ff; color:#1e3a8a; font-weight:700; padding:2px 6px; border-radius:6px; font-size:10px; margin-left:6px; }
 
-    .footer { padding: 24px; color: #6b7280; text-align: center; }
-    .hidden { display: none !important; }
+    .footer { padding: 18px 20px; color: #6b7280; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="card">
       <div class="header">
-        <h1>📄 MANKI Parser → One‑View Export</h1>
+        <h1>📋 MANKI Parser → One‑View Export</h1>
+        <p>Upload invoice PDFs, review parsed lines, view per‑invoice notes, and export to your One‑View template.</p>
       </div>
+
+      <div id="topAlert" class="alert"></div>
 
       <div class="controls">
         <div>
           <label>Choose PDF(s): </label>
           <input id="pdfInput" type="file" accept="application/pdf" multiple />
         </div>
-        <button id="btnParse" class="btn">Parse PDF</button>
+        <button id="btnParse" class="btn primary">Parse PDF</button>
+        <div class="spacer"></div>
         <div>
           <label>Invoice:</label>
           <select id="invoiceSelect"><option value="">All Invoices</option></select>
         </div>
-        <button id="btnExport" class="btn">Export to Excel (One‑View)</button>
+        <button id="btnExport" class="btn success">Export to Excel (One‑View)</button>
         <button id="btnCsv" class="btn ghost">Export CSV</button>
-        <div class="spacer"></div>
-        <button id="btnDemo" class="btn secondary" title="Loads sample text for quick testing">Load Demo</button>
+        <button id="btnDemo" class="btn warn" title="Load sample text for quick testing">Demo</button>
       </div>
 
-      <div id="alert" class="alert"></div>
-
       <div class="stats">
-        <div class="stat"><div class="lbl">Invoice Number</div><div id="statInv" class="val">—</div></div>
-        <div class="stat"><div class="lbl">Invoice Date <span class="badge">editable</span></div><div class="val"><input id="statDate" type="text" placeholder="MM/DD/YYYY" /></div></div>
-        <div class="stat"><div class="lbl">Supplier <span class="badge">editable</span></div><div class="val"><input id="statSupplier" type="text" placeholder="Supplier name" /></div></div>
-        <div class="stat"><div class="lbl">Invoice Total <span class="badge">editable</span></div><div class="val"><input id="statTotal" type="number" step="0.01" placeholder="0.00" /></div></div>
-        <div class="stat"><div class="lbl">Sum of Lines</div><div id="statSum" class="val">$0.00</div></div>
-        <div class="stat"><div class="lbl">Difference</div><div id="statDiff" class="val">$0.00</div></div>
+        <div class="stat"><div class="label">Invoice Number</div><div id="statInv" class="value">—</div></div>
+        <div class="stat"><div class="label">Invoice Date <span class="badge">editable</span></div><div class="value"><input id="statDate" type="text" placeholder="MM/DD/YYYY" /></div></div>
+        <div class="stat"><div class="label">Supplier <span class="badge">editable</span></div><div class="value"><input id="statSupplier" type="text" placeholder="Supplier name" /></div></div>
+        <div class="stat"><div class="label">Invoice Total <span class="badge">editable</span></div><div class="value"><input id="statTotal" type="number" step="0.01" placeholder="0.00" /></div></div>
+        <div class="stat"><div class="label">Sum of Lines</div><div id="statSum" class="value">$0.00</div></div>
+        <div class="stat"><div class="label">Difference</div><div id="statDiff" class="value">$0.00</div></div>
       </div>
 
       <div class="table-wrap">
@@ -131,114 +126,90 @@
         </table>
       </div>
 
-      <div class="footer">Place <code>oneview_template.xlsx</code> beside this HTML in your GitHub Pages repo to export using your template.</div>
+      <div class="footer">Place <code>oneview_template.xlsx</code> in the same folder as this HTML in your repo to use the template mapping automatically.</div>
     </div>
   </div>
 
 <script>
 /**********************
- * Utilities
+ * Utilities & State
  **********************/
-const $$ = (sel, root=document) => root.querySelector(sel);
-const $$$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const $$ = (s, r=document)=>r.querySelector(s);
+const $$$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
 const fmt = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-function money(n){ if(n==null || isNaN(n)) return "$0.00"; return `$${fmt.format(Number(n))}`; }
-function toNumber(s){ if(s==null) return NaN; return Number(String(s).replace(/[,\s]/g, "")); }
-function clean(s){ return String(s||"").replace(/\s+/g, " ").trim(); }
-function downloadBlob(blob, filename){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000); }
-function showInfo(msg){ const el=$$('#alert'); el.textContent = msg; el.style.display = msg ? 'block' : 'none'; }
+const money = n => (n==null||isNaN(n))? '$0.00' : `$${fmt.format(Number(n))}`;
+const toNumber = s => s==null? NaN : Number(String(s).replace(/[,\s]/g,''));
+const clean = s => String(s||'').replace(/\s+/g,' ').trim();
+function showInfo(msg){ const a=$$('#topAlert'); a.textContent=msg||''; a.style.display=msg? 'block':'none'; }
+function downloadBlob(blob, filename){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+
+let allRows = [];
+let invoices = []; // meta list
+let notesByInvoice = {};
+let templateArrayBuffer = null;
 
 /**********************
- * Global state
+ * PDF ingest
  **********************/
-let allRows = []; // normalized rows
-let invoices = []; // [{invoice_number, date, total, supplier, notes:[] }]
-let notesByInvoice = {}; // {inv: [..notes]}
-let templateArrayBuffer = null; // loaded template for export
-let lastChosenFiles = [];
+const pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+if(!pdfjsLib){ console.error('pdf.js not available'); }
 
-/**********************
- * PDF ingestion
- **********************/
-const pdfjsLib = window['pdfjs-dist/build/pdf'];
-if (pdfjsLib) { pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc; }
-
-async function onParseClicked(){
-  const files = Array.from($$('#pdfInput').files||[]);
-  if(!files.length){ showInfo('Please choose one or more PDF files.'); return; }
-  lastChosenFiles = files; await readPdfFiles(files);
+async function extractPdfText(arrayBuffer){
+  // Guard if pdfjs failed to init
+  if(!pdfjsLib || !pdfjsLib.getDocument){ throw new Error('pdf.js not initialized'); }
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let out = '';
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    out += content.items.map(i=>i.str).join('\n') + '\n';
+  }
+  return out;
 }
 
 async function readPdfFiles(files){
-  showInfo('Parsing…');
+  showInfo('Parsing '+files.length+' PDF(s)…');
   allRows = []; invoices = []; notesByInvoice = {};
   for(const f of files){
     try{
       const buf = await f.arrayBuffer();
-      const text = await extractPdfText(buf);
-      await parseInvoicesFromText(text);
-    }catch(err){ console.error(err); showInfo('Error reading '+f.name+': '+err.message); }
+      const txt = await extractPdfText(buf);
+      await parseInvoicesFromText(txt);
+    }catch(err){ console.error(err); showInfo('Error parsing '+f.name+': '+err.message); }
   }
   hydrateUI();
-  showInfo('Parsed '+invoices.length+' invoice(s). Use the dropdown to view notes.');
-}
-
-async function extractPdfText(arrayBuffer){
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let full = '';
-  for(let p=1; p<=pdf.numPages; p++){
-    const page = await pdf.getPage(p);
-    const content = await page.getTextContent();
-    const pageText = content.items.map(it => it.str).join('\n');
-    full += pageText + '\n';
-  }
-  return full;
+  showInfo('Parsed '+invoices.length+' invoice(s). Select an invoice to view notes.');
 }
 
 /**********************
- * Parsing logic (robust to spacing/line-breaks)
+ * Parsing heuristics
  **********************/
 const RE_INVOICE_HDR = /Customs\s+Invoice\s+(\d{6,})\s+from\s+(\d{2}\/\d{2}\/\d{4})/gi;
 const RE_AMENDED = /Amended\s+customs\s+invoice\s+(\d{6,})/gi;
 
 async function parseInvoicesFromText(txt){
-  // Identify invoice headers first
   const headers = [];
-  for(const m of txt.matchAll(RE_INVOICE_HDR)){
-    headers.push({ index: m.index, number: m[1], date: m[2] });
-  }
-  for(const m of txt.matchAll(RE_AMENDED)){
-    // add if not already present
-    if(!headers.some(h=>h.number===m[1])) headers.push({ index: m.index, number: m[1], date: '' });
-  }
-  if(!headers.length){
-    // last resort: try a simpler anchor
-    const m = txt.match(/Invoice\s+(\d{6,})/i);
-    if(m) headers.push({ index: 0, number: m[1], date: '' });
-  }
-
+  for(const m of txt.matchAll(RE_INVOICE_HDR)) headers.push({ index:m.index, number:m[1], date:m[2] });
+  for(const m of txt.matchAll(RE_AMENDED)) if(!headers.some(h=>h.number===m[1])) headers.push({ index:m.index, number:m[1], date:'' });
+  if(!headers.length){ const m = txt.match(/Invoice\s+(\d{6,})/i); if(m) headers.push({ index:0, number:m[1], date:'' }); }
   headers.sort((a,b)=>a.index-b.index);
+
   for(let i=0;i<headers.length;i++){
     const h = headers[i];
-    const end = (i < headers.length-1) ? headers[i+1].index : txt.length;
+    const end = (i<headers.length-1)? headers[i+1].index : txt.length;
     const block = txt.slice(h.index, end);
     const supplier = findSupplier(block);
     const total = findOverallAmount(block);
-
-    const invMeta = { invoice_number: h.number, invoice_date: h.date||'', supplier, invoice_total: total, notes: [] };
-
-    // Parse line items within the block
+    const invMeta = { invoice_number:h.number, invoice_date:h.date||'', supplier, invoice_total: total, notes: [] };
     const rows = parseLines(block, invMeta);
     if(!(h.number in notesByInvoice)) notesByInvoice[h.number] = [];
 
-    // compute sum and note differences
-    const sum = rows.reduce((a,r)=> a + (toNumber(r.line_total)||0), 0);
-    const diff = (toNumber(total)||0) - sum;
-    if(toNumber(total) && Math.abs(diff) > 0.01){
-      notesByInvoice[h.number].push(`Sum of lines ${money(sum)} differs from invoice total ${money(total)} by ${money(diff)}`);
-    }
+    // reconciliation note
+    const sum = rows.reduce((a,r)=>a+(toNumber(r.line_total)||0),0);
+    const diff = (toNumber(total)||0)-sum;
+    if(toNumber(total) && Math.abs(diff)>0.01) notesByInvoice[h.number].push(`Sum of lines ${money(sum)} differs from invoice total ${money(total)} by ${money(diff)}`);
 
-    // Known gaps from your PDFs (helps users correct quickly)
+    // known misses by invoice
     detectKnownMissing(h.number, rows);
 
     allRows.push(...rows);
@@ -249,127 +220,85 @@ async function parseInvoicesFromText(txt){
 function findSupplier(block){
   const SUP_RE = /(R[üu]dt\s+Industrielacke\s+GmbH\s*&\s*Co\.?\s*KG|Norix\s+Lackf\s*abrik\s+GmbH\s*&\s*Co\.?\s*KG|Finalin\s+GmbH\s*&\s*Co\.?\s*KG)/i;
   const m = block.match(SUP_RE);
-  return m ? clean(m[1]) : '';
+  return m? clean(m[1]) : '';
 }
-
 function findOverallAmount(block){
-  const AMT_RE = /Overall\s+amount\s+in\s+USD\s+([0-9,]+\.[0-9]{2})/i;
-  const m = block.match(AMT_RE);
-  return m ? m[1] : '';
+  const m = block.match(/Overall\s+amount\s+in\s+USD\s+([0-9,]+\.[0-9]{2})/i);
+  return m? m[1] : '';
 }
 
 function parseLines(block, inv){
-  const chunks = [];
-  const lines = block.split(/\n+/);
+  const chunks=[]; const lines = block.split(/\n+/);
   for(let i=0;i<lines.length;i++){
     const line = lines[i];
     if(/^\s*\d{2,3}\b/.test(line)){
-      let j=i+1; let chunk=[line];
-      while(j<lines.length && !/^\s*\d{2,3}\b/.test(lines[j])){ chunk.push(lines[j]); j++; }
-      chunks.push(chunk.join('\n'));
-      i = j-1;
+      let j=i+1; const c=[line];
+      while(j<lines.length && !/^\s*\d{2,3}\b/.test(lines[j])){ c.push(lines[j]); j++; }
+      chunks.push(c.join('\n')); i=j-1;
     }
   }
-
-  const out = [];
-  for(const ch of chunks){
-    const row = extractFromChunk(ch, inv);
-    if(row){ out.push(row); }
-  }
-  return out;
+  return chunks.map(ch=>extractFromChunk(ch, inv)).filter(Boolean);
 }
 
 function extractFromChunk(txt, inv){
   const notes = (notesByInvoice[inv.invoice_number] ||= []);
-  const mPos = txt.match(/^(\s*)(\d{2,3})\b/);
-  const position = mPos ? mPos[2] : '';
+  const mPos = txt.match(/^(\s*)(\d{2,3})\b/); const position = mPos? mPos[2] : '';
   if(!position) notes.push('A line without a valid position was skipped.');
 
-  let part = '';
-  const afterPos = txt.replace(/^\s*\d{2,3}\s+/, '');
-  const mPart = afterPos.match(/^([A-Z0-9][A-Z0-9\.-]+)/i);
-  if(mPart) part = mPart[1]; else notes.push(`Pos ${position||'?'}: missing/odd part number.`);
+  let part=''; const afterPos = txt.replace(/^\s*\d{2,3}\s+/, '');
+  const mPart = afterPos.match(/^([A-Z0-9][A-Z0-9\.-]+)/i); if(mPart) part=mPart[1]; else notes.push(`Pos ${position||'?'}: missing/odd part number.`);
 
-  let quantity = '', unit = '';
-  const mQty2 = txt.match(/\b([0-9]+(?:\.[0-9]+)?)\s*(KG|GAL|QT|PT|FOZ|L)\b(?!\/)/i);
-  if(mQty2){ quantity = mQty2[1]; unit = mQty2[2].toUpperCase(); }
+  let quantity='', unit='';
+  const mQty = txt.match(/\b([0-9]+(?:\.[0-9]+)?)\s*(KG|GAL|QT|PT|FOZ|L)\b(?!\/)/i);
+  if(mQty){ quantity=mQty[1]; unit=mQty[2].toUpperCase(); }
 
-  let unit_price = '';
-  const mUP = txt.match(/([0-9]+\.[0-9]+)\s*USD\/(?:KG|GAL|QT|PT|FOZ|L)/i);
-  if(mUP) unit_price = mUP[1]; else notes.push(`Pos ${position||'?'}: unit price not found.`);
+  let unit_price=''; const mUP = txt.match(/([0-9]+\.[0-9]+)\s*USD\/(?:KG|GAL|QT|PT|FOZ|L|CN)/i);
+  if(mUP) unit_price=mUP[1]; else notes.push(`Pos ${position||'?'}: unit price not found.`);
 
-  let line_total = '';
+  let line_total='';
   let mLT = txt.match(/Total\s+price\s+USD\s*([0-9,]+\.[0-9]{2})/i);
   if(!mLT){ mLT = txt.match(/\b([0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2})\b(?![\s\S]*\b\d{1,3}(?:,\d{3})*\.\d{2}\b)/); }
-  if(mLT) line_total = mLT[1]; else notes.push(`Pos ${position||'?'}: line total not found.`);
+  if(mLT) line_total=mLT[1]; else notes.push(`Pos ${position||'?'}: line total not found.`);
 
-  let net_weight = '';
-  const mNW = txt.match(/net\s+weight\s*[:\s]\s*([0-9]+(?:\.[0-9]+)?)/i);
-  if(mNW) net_weight = mNW[1];
+  let net_weight=''; const mNW = txt.match(/net\s+weight\s*[:\s]\s*([0-9]+(?:\.[0-9]+)?)/i); if(mNW) net_weight=mNW[1];
+  let country_of_origin=''; const mCO = txt.match(/Country\s+of\s+origin\s*:\s*([A-Za-z ]+)/i); if(mCO) country_of_origin=clean(mCO[1]).slice(0,2).toUpperCase();
 
-  let country_of_origin = '';
-  const mCO = txt.match(/Country\s+of\s+origin\s*:\s*([A-Za-z ]+)/i);
-  if(mCO) country_of_origin = clean(mCO[1]).slice(0,2).toUpperCase();
-
-  const calc_total = (toNumber(quantity) && toNumber(unit_price)) ? (toNumber(quantity) * toNumber(unit_price)) : NaN;
-
+  const calc_total = (toNumber(quantity)&&toNumber(unit_price))? (toNumber(quantity)*toNumber(unit_price)) : NaN;
   if(!position && !part && !line_total) return null;
   return {
     invoice_number: inv.invoice_number,
     invoice_date: inv.invoice_date,
     invoice_total: inv.invoice_total,
     supplier: inv.supplier,
-    position: position || '',
-    part_number: part || '',
-    quantity: quantity || '',
-    unit: unit || '',
-    unit_price: unit_price || '',
-    line_total: line_total || '',
-    calc_total: isNaN(calc_total) ? '' : fmt.format(calc_total),
-    net_weight: net_weight || '',
-    country_of_origin: country_of_origin || ''
+    position: position||'',
+    part_number: part||'',
+    quantity: quantity||'',
+    unit: unit||'',
+    unit_price: unit_price||'',
+    line_total: line_total||'',
+    calc_total: isNaN(calc_total)? '' : fmt.format(calc_total),
+    net_weight: net_weight||'',
+    country_of_origin: country_of_origin||''
   };
 }
 
 function detectKnownMissing(invNumber, rows){
-  // Based on your notes: positions that often fail due to PDF line wraps
-  const knownMissing = {
-    '90286504': [],
-    '90286988': [26, 28, 67],
-    '90286989': [31],
-    '90286990': [],
-    '90286991': [],
-    '90286992': [10],
-    '90286993': []
-  };
-  const miss = knownMissing[invNumber] || [];
-  if(!miss.length) return;
-  const present = new Set(rows.map(r=>Number(r.position))); const absent = miss.filter(p=>!present.has(Number(p)));
-  if(absent.length){
-    (notesByInvoice[invNumber] ||= []).push('Missing positions (from PDF wraps): '+absent.join(', '));
-  }
+  const knownMissing = { '90286504': [], '90286988': [26,28,67], '90286989':[31], '90286990':[], '90286991':[], '90286992':[10], '90286993':[] };
+  const expected = knownMissing[invNumber]||[]; if(!expected.length) return;
+  const have = new Set(rows.map(r=>Number(r.position))); const absent = expected.filter(p=>!have.has(Number(p)));
+  if(absent.length) (notesByInvoice[invNumber] ||= []).push('Missing positions (from PDF wraps): '+absent.join(', '));
 }
 
 /**********************
- * UI rendering & binding
+ * UI rendering
  **********************/
 function hydrateUI(){
-  const map = new Map();
-  for(const row of allRows){
-    if(!map.has(row.invoice_number)){
-      map.set(row.invoice_number, {
-        invoice_number: row.invoice_number,
-        invoice_date: row.invoice_date,
-        supplier: row.supplier,
-        invoice_total: row.invoice_total,
-      });
-    }
-  }
-  invoices = invoices.map(i => ({...i, ...(map.get(i.invoice_number)||{}) }));
+  const invMap = new Map();
+  for(const r of allRows){ if(!invMap.has(r.invoice_number)) invMap.set(r.invoice_number, { invoice_number:r.invoice_number, invoice_date:r.invoice_date, supplier:r.supplier, invoice_total:r.invoice_total }); }
+  invoices = invoices.map(i=>({...i, ...(invMap.get(i.invoice_number)||{}) }));
 
-  const sel = $$('#invoiceSelect');
-  sel.innerHTML = '<option value="">All Invoices</option>' + invoices.map(i => `<option value="${i.invoice_number}">${i.invoice_number} — ${clean(i.supplier)||'Supplier ?'}</option>`).join('');
-
+  const sel=$$('#invoiceSelect');
+  sel.innerHTML = '<option value="">All Invoices</option>' + invoices.map(i=>`<option value="${i.invoice_number}">${i.invoice_number} — ${clean(i.supplier)||'Supplier ?'}</option>`).join('');
   renderTable();
 }
 
@@ -377,22 +306,25 @@ function getFilterInvoice(){ return $$('#invoiceSelect').value; }
 
 function renderTable(){
   const invSel = getFilterInvoice();
-  const rows = invSel ? allRows.filter(r => r.invoice_number===invSel) : allRows.slice();
-  const tb = $$('#tbody'); tb.innerHTML = '';
+  const rows = invSel ? allRows.filter(r=>r.invoice_number===invSel) : allRows.slice();
+  const tb = $$('#tbody'); tb.innerHTML='';
 
-  const invMeta = invoices.find(i => i.invoice_number===invSel) || { invoice_number:'—', invoice_date:'', supplier:'', invoice_total:'' };
+  const invMeta = invoices.find(i=>i.invoice_number===invSel) || { invoice_number:'—', invoice_date:'', supplier:'', invoice_total:'' };
   $$('#statInv').textContent = invMeta.invoice_number || '—';
   $$('#statDate').value = invMeta.invoice_date || '';
   $$('#statSupplier').value = invMeta.supplier || '';
   $$('#statTotal').value = invMeta.invoice_total || '';
 
   const notes = invSel ? (notesByInvoice[invSel]||[]) : [];
-  if(notes.length){ showInfo('Notes for invoice ' + invSel + ': ' + notes.join(' • ')); } else { showInfo(''); }
+  showInfo(notes.length? ('Notes for invoice '+invSel+': '+notes.join(' • ')) : '');
 
-  let sum = 0;
+  let sum=0; for(const r of rows){ sum += (toNumber(r.line_total)||0); }
+  $$('#statSum').textContent = money(sum);
+  const invTotal = toNumber(invMeta.invoice_total)||0; $$('#statDiff').textContent = money(invTotal - sum);
+
   for(const r of rows){
-    const tr = document.createElement('tr');
-    const lt = toNumber(r.line_total)||0; sum += lt;
+    const tr=document.createElement('tr'); const lt = toNumber(r.line_total)||0; const calc = toNumber(r.calc_total)||0;
+    const mismatch = r.calc_total && Math.abs(calc - lt) > 0.01;
     tr.innerHTML = `
       <td>${r.position||''}</td>
       <td><input data-k="part_number" value="${r.part_number||''}"></td>
@@ -400,199 +332,87 @@ function renderTable(){
       <td><input data-k="unit" value="${r.unit||''}"></td>
       <td class="num"><input class="num" data-k="unit_price" value="${r.unit_price||''}"></td>
       <td class="num"><input class="num" data-k="line_total" value="${r.line_total||''}"></td>
-      <td class="num ${r.calc_total && Math.abs(toNumber(r.calc_total)-lt)>0.01 ? 'error':''}">${r.calc_total||''}</td>
+      <td class="num ${mismatch? 'error':''}">${r.calc_total||''}</td>
       <td class="num"><input class="num" data-k="net_weight" value="${r.net_weight||''}"></td>
       <td><input data-k="country_of_origin" value="${r.country_of_origin||''}"></td>
-      <td class="actions"><button class="btn warn" data-act="recalc">Recalc</button> <button class="btn ghost" data-act="del">Delete</button></td>
-    `;
-    tr.dataset.inv = r.invoice_number; tr.dataset.pos = r.position;
-    tb.appendChild(tr);
+      <td class="actions"><button class="btn warn" data-act="recalc">Recalc</button> <button class="btn ghost" data-act="del">Delete</button></td>`;
+    tr.dataset.inv=r.invoice_number; tr.dataset.pos=r.position; tb.appendChild(tr);
   }
-
-  $$('#statSum').textContent = money(sum);
-  const invTotal = toNumber(invMeta.invoice_total)||0;
-  $$('#statDiff').textContent = money(invTotal - sum);
 }
 
 // table actions
-$$('#tbody').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-act]'); if(!btn) return;
-  const tr = e.target.closest('tr'); if(!tr) return;
-  const inv = tr.dataset.inv; const pos = tr.dataset.pos;
-  const idx = allRows.findIndex(r => r.invoice_number===inv && r.position===pos);
-  if(idx<0) return;
-  const act = btn.dataset.act;
+$$('#tbody').addEventListener('click', e=>{
+  const btn=e.target.closest('button[data-act]'); if(!btn) return; const tr=e.target.closest('tr'); if(!tr) return;
+  const inv=tr.dataset.inv, pos=tr.dataset.pos; const idx=allRows.findIndex(r=>r.invoice_number===inv&&r.position===pos); if(idx<0) return;
+  const act=btn.dataset.act;
   if(act==='recalc'){
-    const r = allRows[idx];
-    const calc = (toNumber(r.quantity)||0) * (toNumber(r.unit_price)||0);
-    r.calc_total = fmt.format(calc);
-    renderTable();
-  } else if(act==='del'){
-    allRows.splice(idx,1); renderTable();
-  }
+    const r=allRows[idx]; const calc=(toNumber(r.quantity)||0)*(toNumber(r.unit_price)||0); r.calc_total=fmt.format(calc); renderTable();
+  } else if(act==='del'){ allRows.splice(idx,1); renderTable(); }
 });
 
 // two-way bind
-$$('#tbody').addEventListener('input', (e)=>{
-  const inp = e.target.closest('input[data-k]'); if(!inp) return;
-  const tr = e.target.closest('tr'); const inv = tr.dataset.inv; const pos = tr.dataset.pos;
-  const idx = allRows.findIndex(r => r.invoice_number===inv && r.position===pos);
-  if(idx<0) return;
-  const key = inp.dataset.k; allRows[idx][key] = inp.value;
+$$('#tbody').addEventListener('input', e=>{
+  const inp=e.target.closest('input[data-k]'); if(!inp) return; const tr=e.target.closest('tr'); const inv=tr.dataset.inv, pos=tr.dataset.pos;
+  const idx=allRows.findIndex(r=>r.invoice_number===inv&&r.position===pos); if(idx<0) return; const k=inp.dataset.k; allRows[idx][k]=inp.value;
 });
 
-$$('#invoiceSelect').addEventListener('change', ()=> renderTable());
-
-// edit header meta
-$$('#statDate').addEventListener('input', (e)=>{
-  const inv = getFilterInvoice(); if(!inv) return;
-  const meta = invoices.find(i=>i.invoice_number===inv); if(meta){ meta.invoice_date = e.target.value; }
-  allRows.filter(r=>r.invoice_number===inv).forEach(r=> r.invoice_date = e.target.value);
-});
-$$('#statSupplier').addEventListener('input', (e)=>{
-  const inv = getFilterInvoice(); if(!inv) return;
-  const meta = invoices.find(i=>i.invoice_number===inv); if(meta){ meta.supplier = e.target.value; }
-  allRows.filter(r=>r.invoice_number===inv).forEach(r=> r.supplier = e.target.value);
-});
-$$('#statTotal').addEventListener('input', (e)=>{
-  const inv = getFilterInvoice(); if(!inv) return;
-  const meta = invoices.find(i=>i.invoice_number===inv); if(meta){ meta.invoice_total = e.target.value; }
-  allRows.filter(r=>r.invoice_number===inv).forEach(r=> r.invoice_total = e.target.value);
-  renderTable();
-});
+// header meta edits
+$$('#statDate').addEventListener('input', e=>{ const inv=getFilterInvoice(); if(!inv) return; const meta=invoices.find(i=>i.invoice_number===inv); if(meta){ meta.invoice_date=e.target.value; } allRows.filter(r=>r.invoice_number===inv).forEach(r=>r.invoice_date=e.target.value); });
+$$('#statSupplier').addEventListener('input', e=>{ const inv=getFilterInvoice(); if(!inv) return; const meta=invoices.find(i=>i.invoice_number===inv); if(meta){ meta.supplier=e.target.value; } allRows.filter(r=>r.invoice_number===inv).forEach(r=>r.supplier=e.target.value); });
+$$('#statTotal').addEventListener('input', e=>{ const inv=getFilterInvoice(); if(!inv) return; const meta=invoices.find(i=>i.invoice_number===inv); if(meta){ meta.invoice_total=e.target.value; } allRows.filter(r=>r.invoice_number===inv).forEach(r=>r.invoice_total=e.target.value); renderTable(); });
 
 /**********************
- * Export (Template-aware)
+ * Export helpers
  **********************/
 async function ensureTemplateLoaded(){
   if(templateArrayBuffer) return true;
-  try{
-    const res = await fetch('oneview_template.xlsx', { cache: 'no-store' });
-    if(!res.ok) throw new Error('not found');
-    templateArrayBuffer = await res.arrayBuffer();
-    return true;
-  }catch(err){
-    console.warn('Template not found, exporting a generic workbook.');
-    return false;
-  }
+  try{ const res = await fetch('oneview_template.xlsx', { cache:'no-store' }); if(!res.ok) throw new Error('not found'); templateArrayBuffer = await res.arrayBuffer(); return true; }catch(e){ console.warn('Template not found; will export generic workbook.'); return false; }
 }
 
 function buildWorksheetData(invFilter){
   const rows = invFilter ? allRows.filter(r=>r.invoice_number===invFilter) : allRows;
-  const header = [
-    'Invoice Number','Invoice Date','Supplier','Invoice Total',
-    'Position','Part Number','Quantity','Unit','Unit Price','Line Total','Calc Total','Net Weight','Country'
-  ];
-  const data = rows.map(r => [
-    r.invoice_number, r.invoice_date, r.supplier, r.invoice_total,
-    r.position, r.part_number, r.quantity, r.unit, r.unit_price, r.line_total, r.calc_total, r.net_weight, r.country_of_origin
-  ]);
+  const header = ['Invoice Number','Invoice Date','Supplier','Invoice Total','Position','Part Number','Quantity','Unit','Unit Price','Line Total','Calc Total','Net Weight','Country'];
+  const data = rows.map(r=>[ r.invoice_number, r.invoice_date, r.supplier, r.invoice_total, r.position, r.part_number, r.quantity, r.unit, r.unit_price, r.line_total, r.calc_total, r.net_weight, r.country_of_origin ]);
   return { header, data };
 }
 
 function exportGeneric(inv){
-  const { header, data } = buildWorksheetData(inv);
-  const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'OneView');
-  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  downloadBlob(new Blob([out], {type:'application/octet-stream'}), `oneview_export_${inv||'all'}.xlsx`);
+  const {header, data} = buildWorksheetData(inv); const ws = XLSX.utils.aoa_to_sheet([header, ...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'OneView'); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); downloadBlob(new Blob([out],{type:'application/octet-stream'}), `oneview_export_${inv||'all'}.xlsx`);
 }
 
 function mapHeaders(ws){
-  const range = XLSX.utils.decode_range(ws['!ref']);
-  let headerRow = range.s.r;
-  let headers = [];
-  for(let r=range.s.r; r<=Math.min(range.s.r+10, range.e.r); r++){
-    const rowVals = [];
-    for(let c=range.s.c; c<=range.e.c; c++){
-      const cell = ws[XLSX.utils.encode_cell({r,c})];
-      rowVals.push(cell ? String(cell.v).trim() : '');
-    }
-    const joined = rowVals.join('|').toLowerCase();
-    if(/invoice/.test(joined) && /part/.test(joined)) { headerRow = r; headers = rowVals; break; }
+  const range = XLSX.utils.decode_range(ws['!ref']); let headerRow=range.s.r, headers=[];
+  for(let r=range.s.r;r<=Math.min(range.s.r+10, range.e.r);r++){
+    const rowVals=[]; for(let c=range.s.c;c<=range.e.c;c++){ const cell=ws[XLSX.utils.encode_cell({r,c})]; rowVals.push(cell? String(cell.v).trim() : ''); }
+    const joined=rowVals.join('|').toLowerCase(); if(/invoice/.test(joined) && /part/.test(joined)){ headerRow=r; headers=rowVals; break; }
   }
   return { headerRow, headers };
 }
 
 function exportWithTemplate(inv){
-  const wb = XLSX.read(templateArrayBuffer, { type: 'array' });
-  const wsName = wb.SheetNames[0];
-  const ws = wb.Sheets[wsName];
-  const { header, data } = buildWorksheetData(inv);
-
-  const { headerRow, headers } = mapHeaders(ws);
-  const colIndex = new Map();
-  headers.forEach((h,i)=>{ colIndex.set(h.trim().toLowerCase(), i); });
-
-  function findCol(name){
-    const i = colIndex.get(name.toLowerCase());
-    if(i!=null) return i;
-    for(const [k,v] of colIndex){ if(k.includes(name.toLowerCase())) return v; }
-    return null;
-  }
-
-  const mapping = {
-    'Invoice Number': findCol('invoice number'),
-    'Invoice Date': findCol('invoice date'),
-    'Supplier': findCol('supplier'),
-    'Invoice Total': findCol('invoice total'),
-    'Position': findCol('position'),
-    'Part Number': findCol('part number'),
-    'Quantity': findCol('quantity'),
-    'Unit': findCol('unit'),
-    'Unit Price': findCol('unit price'),
-    'Line Total': findCol('line total'),
-    'Calc Total': findCol('calc total'),
-    'Net Weight': findCol('net weight'),
-    'Country': findCol('country')
-  };
-
-  const startRow = headerRow + 1; // write under header
-  let r = startRow;
-  for(const row of data){
-    header.forEach((h, idx)=>{
-      const c = mapping[h]; if(c==null) return;
-      const cellRef = XLSX.utils.encode_cell({ r, c });
-      const v = row[idx];
-      const isNum = typeof v === 'number' || /^-?\d+(?:\.\d+)?$/.test(String(v));
-      ws[cellRef] = isNum ? { t: 'n', v: Number(v) } : { t: 's', v: String(v??'') };
-    });
-    r++;
-  }
-  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(r, headerRow)+1, c: 50 } });
-
-  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  downloadBlob(new Blob([out], {type:'application/octet-stream'}), `oneview_export_${inv||'all'}.xlsx`);
+  const wb = XLSX.read(templateArrayBuffer, { type:'array' }); const wsName=wb.SheetNames[0]; const ws=wb.Sheets[wsName]; const {header, data}=buildWorksheetData(inv);
+  const {headerRow, headers} = mapHeaders(ws); const colIndex=new Map(); headers.forEach((h,i)=>colIndex.set(h.trim().toLowerCase(), i));
+  const findCol = name => colIndex.get(name.toLowerCase()) ?? (()=>{ for(const [k,v] of colIndex){ if(k.includes(name.toLowerCase())) return v; } return null; })();
+  const mapping = { 'Invoice Number':findCol('invoice number'), 'Invoice Date':findCol('invoice date'), 'Supplier':findCol('supplier'), 'Invoice Total':findCol('invoice total'), 'Position':findCol('position'), 'Part Number':findCol('part number'), 'Quantity':findCol('quantity'), 'Unit':findCol('unit'), 'Unit Price':findCol('unit price'), 'Line Total':findCol('line total'), 'Calc Total':findCol('calc total'), 'Net Weight':findCol('net weight'), 'Country':findCol('country') };
+  let r = headerRow+1; for(const row of data){ header.forEach((h,idx)=>{ const c=mapping[h]; if(c==null) return; const ref=XLSX.utils.encode_cell({r,c}); const v=row[idx]; const isNum=(typeof v==='number')||/^[-+]?\d+(?:\.\d+)?$/.test(String(v)); ws[ref] = isNum? {t:'n', v:Number(v)} : {t:'s', v:String(v??'')}; }); r++; }
+  ws['!ref']=XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:Math.max(r, headerRow)+1, c:50} });
+  const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); downloadBlob(new Blob([out],{type:'application/octet-stream'}), `oneview_export_${inv||'all'}.xlsx`);
 }
 
-$$('#btnExport').addEventListener('click', async ()=>{
-  const inv = getFilterInvoice();
-  const ok = await ensureTemplateLoaded();
-  if(ok && templateArrayBuffer){ exportWithTemplate(inv); }
-  else { exportGeneric(inv); }
-});
-
-$$('#btnCsv').addEventListener('click', ()=>{
-  const inv = getFilterInvoice();
-  const { header, data } = buildWorksheetData(inv);
-  const csv = [header.join(','), ...data.map(r=> r.map(v => '"'+String(v??'').replace(/"/g,'""')+'"').join(','))].join('\n');
-  downloadBlob(new Blob([csv], {type:'text/csv'}), `oneview_export_${inv||'all'}.csv`);
-});
+// Export buttons
+$$('#btnExport').addEventListener('click', async ()=>{ const inv=getFilterInvoice(); const ok=await ensureTemplateLoaded(); if(ok && templateArrayBuffer) exportWithTemplate(inv); else exportGeneric(inv); });
+$$('#btnCsv').addEventListener('click', ()=>{ const inv=getFilterInvoice(); const {header,data}=buildWorksheetData(inv); const csv=[header.join(','), ...data.map(r=> r.map(v=> '"'+String(v??'').replace(/"/g,'""')+'"').join(','))].join('\n'); downloadBlob(new Blob([csv],{type:'text/csv'}), `oneview_export_${inv||'all'}.csv`); });
 
 /**********************
- * Demo loader
+ * Controls
  **********************/
+$$('#btnParse').addEventListener('click', ()=>{ const files=Array.from($$('#pdfInput').files||[]); if(!files.length){ showInfo('Please choose one or more PDF files.'); return; } readPdfFiles(files); });
+
+// Demo
 $$('#btnDemo').addEventListener('click', ()=>{
-  const sample = `Customs Invoice 90286988 from 10/01/2025\n\n20 H5390.6119.0.170 1.0 bucket (s) x 5.000   KG 5.000 KG 14.97600 USD/KG 74.88\nALEXIT-Pigment-Concentrate H53-90 ...\nTotal price USD 74.88\nCountry of origin: Germany\n\n24 14500.0000.0.511 4.0 can(s) x 1.000 PT 4.000 PT 9.54750 USD/PT 38.19\nNEXTEL-Härter / Hardener 5524 ...\nTotal price USD 38.19\nCountry of origin: Germany\n\nOverall amount in USD 130,408.94`;
-  allRows = []; invoices = []; notesByInvoice = {};
-  parseInvoicesFromText(sample).then(()=> hydrateUI());
+  const sample = `Customs Invoice 90286988 from 10/01/2025\n\n20 H5390.6119.0.170 1.0 bucket (s) x 5.000   KG 5.000 KG 14.97600 USD/KG 74.88\nTotal price USD 74.88\nCountry of origin: Germany\n\n24 14500.0000.0.511 4.0 can(s) x 1.000 PT 4.000 PT 9.54750 USD/PT 38.19\nTotal price USD 38.19\nCountry of origin: Germany\n\nOverall amount in USD 130,408.94`;
+  allRows=[]; invoices=[]; notesByInvoice={}; parseInvoicesFromText(sample).then(()=>hydrateUI()); showInfo('Loaded demo data.');
 });
-
-/**********************
- * File input & parse button
- **********************/
-$$('#btnParse').addEventListener('click', onParseClicked);
 </script>
 </body>
 </html>
