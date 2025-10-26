@@ -2,235 +2,699 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MANKI Parser (Stable React Version)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MANKI Parser – Stable + Robust Parsing</title>
 
-  <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- React & Babel -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- SheetJS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-  <!-- pdf.js -->
-  <script id="pdfjs-loader" src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
+  <!-- pdf.js (stable) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
-    document.getElementById("pdfjs-loader").addEventListener("load", function () {
-      try {
-        if (window.pdfjsLib) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc =
-            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js";
-          console.log("✅ pdf.js fully loaded and worker configured");
-          window._pdfReady = true;
-        } else {
-          console.error("❌ pdf.js failed to initialize properly");
-        }
-      } catch (e) {
-        console.error("⚠️ Error initializing pdf.js:", e);
-      }
-    });
+    // Configure worker for GitHub Pages / static hosting
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   </script>
 
+  <!-- SheetJS for export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
   <style>
-    .sticky-header { position: sticky; top: 0; z-index: 40;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .sticky-bar    { position: sticky; top: 76px; z-index: 30; }
-    .sticky-stats  { position: sticky; top: 128px; z-index: 20; }
-    .sticky-thead  { position: sticky; top: 216px; z-index: 10; }
-    .table-area    { height: calc(100vh - 300px); overflow: auto; }
-    .notes-panel   { height: calc(100vh - 250px); overflow: auto; }
-    .mono          { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    :root{
+      --indigo:#667eea; --purple:#764ba2; --rose:#ef4444; --emerald:#10b981; --slate:#64748b;
+      --bg:#f5f7fa; --card:#ffffff; --line:#e5e7eb;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;
+         background:var(--bg); color:#0f172a}
+    .container{max-width:1600px; margin:0 auto; background:var(--card); border-radius:12px;
+               box-shadow:0 8px 28px rgba(0,0,0,.08); overflow:hidden}
+    .header{
+      position:sticky; top:0; z-index:50; color:#fff; padding:24px 28px;
+      background:linear-gradient(135deg,var(--indigo) 0%,var(--purple) 100%);
+    }
+    .header h1{margin:0 0 6px; font-size:20px}
+    .sub{opacity:.95; font-size:13px}
+
+    .upload{padding:28px}
+    .drop{border:2px dashed #cbd5e1; border-radius:12px; padding:26px; text-align:center;
+          cursor:pointer; transition:.2s; background:#f8fafc}
+    .drop:hover{border-color:var(--indigo); background:#eef2ff}
+    .drop.dragover{background:#e0e7ff; border-color:var(--indigo)}
+    #fileInput{display:none}
+
+    .controls{position:sticky; top:84px; z-index:40; background:#fff;
+              border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+              padding:12px 16px; display:flex; gap:10px; align-items:center}
+    .select{padding:10px; border:1px solid #cbd5e1; border-radius:8px; min-width:380px}
+    .btn{padding:10px 14px; border:0; border-radius:8px; font-weight:600; cursor:pointer}
+    .btn-indigo{background:var(--indigo); color:#fff}
+    .btn-indigo:hover{filter:brightness(.95)}
+    .btn-success{background:var(--emerald); color:#fff}
+    .btn-danger{background:var(--rose); color:#fff}
+    .btn-warning{background:#f59e0b; color:#fff}
+    .btn-ghost{background:#eef2ff; color:#1f2937}
+
+    .stats{position:sticky; top:140px; z-index:30; background:#fffbeb; border-bottom:1px solid #fde68a;
+           display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:10px 16px}
+    .stat{padding:10px 12px; background:#fff; border:1px solid #fde68a; border-radius:10px}
+    .stat-label{font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:.03em}
+    .stat-value{font-weight:700; font-variant-numeric:tabular-nums}
+    .stat-value.error{color:var(--rose)}
+    .stat-value.ok{color:var(--emerald)}
+
+    .layout{display:grid; grid-template-columns:2fr 1fr; gap:16px; padding:16px}
+    .card{background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden}
+    .table-wrap{height:calc(100vh - 320px); overflow:auto}
+    table{width:100%; border-collapse:separate; border-spacing:0}
+    thead th{position:sticky; top:196px; z-index:20; /* sticky table header */
+             background:#f8fafc; border-bottom:1px solid var(--line);
+             text-align:left; font-size:12px; padding:10px; text-transform:uppercase}
+    tbody td{border-bottom:1px solid var(--line); padding:8px 10px; font-size:14px; vertical-align:top}
+    tbody tr:hover{background:#f9fafb}
+    td input[type="text"], td input[type="number"]{
+      width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;
+    }
+    td input[readonly]{background:#f8fafc}
+    .calc-cell{font-variant-numeric:tabular-nums}
+    .calc-mismatch{background:#fff1f2}
+    .alert{display:none; margin:12px 16px 0; padding:10px 12px; border-radius:10px; border:1px solid #fecaca; background:#fff1f2; color:#991b1b; font-size:13px}
+
+    .side{padding:16px; height:calc(100vh - 280px); overflow:auto}
+    .side h3{margin:0 0 10px; font-size:14px; color:#334155}
+    .note{background:#f1f5f9; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; font-size:13px; margin-bottom:8px}
+
+    .loading{display:none; padding:28px; text-align:center}
+    .spinner{border:4px solid #e5e7eb; border-top:4px solid var(--indigo); width:50px; height:50px; border-radius:50%;
+             animation:spin 1s linear infinite; margin:0 auto 10px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .meta-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:0 16px 12px}
+    .meta-grid input{padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px}
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
-  <div id="root"></div>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📋 MANKI Parser</h1>
+      <div class="sub">Upload a PDF, pick an invoice, review/fix lines, see notes, and export.</div>
+    </div>
 
-  <script type="text/babel">
-    const { useState, useRef, useMemo } = React;
+    <!-- Upload -->
+    <div class="upload" id="uploadSection">
+      <div class="drop" id="uploadBox">
+        <strong>Click to choose PDF</strong> or drop it here
+        <input id="fileInput" type="file" accept="application/pdf" />
+      </div>
+    </div>
 
-    const money = (n) => isFinite(+n) ? `$${(+n).toFixed(2)}` : "$0.00";
-    const toNum = (v) => Number(String(v).replace(/[,\\s]/g, "")) || 0;
+    <!-- Loading -->
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div>Extracting text from PDF…</div>
+    </div>
 
-    const STATIC_NOTES = { };
+    <!-- Controls -->
+    <div class="controls" id="controls" style="display:none">
+      <select id="invoiceSelect" class="select">
+        <option value="">Select an invoice…</option>
+      </select>
+      <button class="btn btn-indigo" id="exportBtn" title="Export visible invoice (or all, if none selected)">Export to Excel</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" id="showDebugBtn">Debug</button>
+    </div>
 
-    async function extractPdfText(file) {
-      if (!window.pdfjsLib) throw new Error("pdf.js not available");
-      const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-      let text = "";
-      for (let p = 1; p <= pdf.numPages; p++) {
-        const page = await pdf.getPage(p);
-        const c = await page.getTextContent();
-        text += c.items.map(i => i.str).join("\\n") + "\\n";
-      }
-      return text;
-    }
+    <!-- Stats -->
+    <div class="stats" id="stats" style="display:none">
+      <div class="stat"><div class="stat-label">Invoice #</div><div class="stat-value" id="statInvoice">–</div></div>
+      <div class="stat"><div class="stat-label">Invoice Total</div><div class="stat-value" id="statTotal">$0.00</div></div>
+      <div class="stat"><div class="stat-label">Line Items Sum</div><div class="stat-value" id="statSum">$0.00</div></div>
+      <div class="stat"><div class="stat-label">Difference</div><div class="stat-value" id="statDiff">$0.00</div></div>
+    </div>
 
-    function parseInvoices(txt) {
-      const invoices = [];
-      const rows = [];
-      const notes = {};
-      const matches = [...txt.matchAll(/Customs\\s+Invoice\\s+(\\d{6,})/gi)];
-      if (!matches.length) return { invoices, rows, notes };
-      matches.forEach((m, i) => {
-        const start = m.index;
-        const end = i < matches.length - 1 ? matches[i + 1].index : txt.length;
-        const block = txt.slice(start, end);
-        const inv = m[1];
-        const totalMatch = block.match(/Overall\\s+amount\\s+in\\s+USD\\s+([\\d,]+\\.\\d{2})/i);
-        const total = totalMatch ? totalMatch[1] : "";
-        const lineMatches = block.matchAll(/^(\\d{1,3})\\s+([A-Z0-9\\-\\.]+)[\\s\\S]*?(\\d+[.,]?\\d*)\\s*(KG|L|GAL|QT|PT)?[\\s\\S]*?([\\d,]+\\.\\d{2})/gmi);
-        const invRows = [];
-        for (const lm of lineMatches) {
-          invRows.push({
-            invoice_number: inv,
-            position: lm[1],
-            part_number: lm[2],
-            quantity: lm[3],
-            unit: lm[4] || "",
-            line_total: lm[5],
-          });
-        }
-        invoices.push({ invoice_number: inv, invoice_total: total });
-        rows.push(...invRows);
-        if (!invRows.length) notes[inv] = ["No line items detected."];
-      });
-      return { invoices, rows, notes };
-    }
+    <!-- Missing positions alert -->
+    <div id="missingItemsAlert" class="alert">
+      <span id="missingItemsText"></span>
+    </div>
 
-    function App() {
-      const [busy, setBusy] = useState(false);
-      const [message, setMessage] = useState("");
-      const [invoices, setInvoices] = useState([]);
-      const [rows, setRows] = useState([]);
-      const [notes, setNotes] = useState({});
-      const [selectedInvoice, setSelectedInvoice] = useState("");
-      const fileRef = useRef();
+    <!-- Editable invoice meta -->
+    <div class="meta-grid" id="metaGrid" style="display:none">
+      <input id="invoiceDateInput" type="text" placeholder="Invoice Date (auto)" />
+      <input id="supplierInput" type="text" placeholder="Supplier (auto)" />
+      <input id="invoiceTotalInput" type="text" placeholder="Invoice Total (auto)" />
+    </div>
 
-      const filteredRows = useMemo(
-        () => (selectedInvoice ? rows.filter(r => r.invoice_number === selectedInvoice) : rows),
-        [rows, selectedInvoice]
-      );
-
-      const stats = useMemo(() => {
-        if (!selectedInvoice) return {};
-        const inv = invoices.find(i => i.invoice_number === selectedInvoice) || {};
-        const total = toNum(inv.invoice_total);
-        const sum = filteredRows.reduce((a, b) => a + toNum(b.line_total), 0);
-        return { total: money(total), sum: money(sum), diff: money(total - sum) };
-      }, [selectedInvoice, invoices, filteredRows]);
-
-      async function handleFiles(e) {
-        const files = Array.from(e.target.files || []);
-        if (!files.length) return;
-        setBusy(true);
-        setMessage("Parsing PDF...");
-        try {
-          const allRows = [], allInv = [], allNotes = {};
-          for (const f of files) {
-            const text = await extractPdfText(f);
-            const { invoices, rows, notes } = parseInvoices(text);
-            allInv.push(...invoices);
-            allRows.push(...rows);
-            Object.assign(allNotes, notes);
-          }
-          setInvoices(allInv);
-          setRows(allRows);
-          setNotes(allNotes);
-          setMessage(`Parsed ${allInv.length} invoice(s).`);
-          if (allInv.length) setSelectedInvoice(allInv[0].invoice_number);
-        } catch (err) {
-          console.error(err);
-          setMessage("Error: " + err.message);
-        } finally {
-          setBusy(false);
-        }
-      }
-
-      return (
-        <div className="max-w-[1400px] mx-auto">
-          <div className="sticky-header text-white px-6 py-5 rounded-b-2xl shadow">
-            <h1 className="text-xl font-bold">📋 MANKI Parser</h1>
-            <p className="text-sm opacity-90">Upload PDF invoices, review parsed lines & notes, and export.</p>
-          </div>
-
-          <div className="sticky-bar bg-white/70 backdrop-blur border-b border-slate-200 px-4 py-3 flex gap-2 items-center">
-            <input ref={fileRef} onChange={handleFiles} type="file" accept="application/pdf" multiple className="hidden" />
-            <button onClick={() => fileRef.current?.click()} disabled={busy}
-              className="px-3 py-2 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60">
-              Choose PDF(s)
-            </button>
-
-            <div className="flex-1"></div>
-
-            <select value={selectedInvoice} onChange={(e)=>setSelectedInvoice(e.target.value)}
-              className="px-3 py-2 border rounded-lg">
-              <option value="">All</option>
-              {invoices.map(i => <option key={i.invoice_number}>{i.invoice_number}</option>)}
-            </select>
-          </div>
-
-          <div className="sticky-stats bg-amber-50 border-b border-amber-300 px-4 py-3 grid grid-cols-3 gap-3">
-            <div><div className="text-xs uppercase">Invoice Total</div><div className="font-bold">{stats.total}</div></div>
-            <div><div className="text-xs uppercase">Sum of Lines</div><div className="font-bold">{stats.sum}</div></div>
-            <div><div className="text-xs uppercase">Difference</div><div className="font-bold">{stats.diff}</div></div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 p-4">
-            <div className="col-span-2 bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
-              <div className="table-area">
-                <table className="w-full">
-                  <thead className="sticky-thead bg-slate-100 border-b">
-                    <tr className="text-xs uppercase">
-                      <th className="px-3 py-2 text-left">Pos</th>
-                      <th className="px-3 py-2 text-left">Part Number</th>
-                      <th className="px-3 py-2 text-left">Qty</th>
-                      <th className="px-3 py-2 text-left">Unit</th>
-                      <th className="px-3 py-2 text-left">Line Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm">
-                    {filteredRows.map((r,i)=>(
-                      <tr key={i} className="border-b">
-                        <td className="px-3 py-2">{r.position}</td>
-                        <td className="px-3 py-2">{r.part_number}</td>
-                        <td className="px-3 py-2">{r.quantity}</td>
-                        <td className="px-3 py-2">{r.unit}</td>
-                        <td className="px-3 py-2 text-right">{r.line_total}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow border border-slate-200 p-4 notes-panel">
-              <h3 className="font-bold text-slate-700 mb-2">Notes</h3>
-              {selectedInvoice && (notes[selectedInvoice]?.length ? (
-                <ul className="list-disc pl-4 text-sm">
-                  {notes[selectedInvoice].map((n,i)=><li key={i}>{n}</li>)}
-                </ul>
-              ) : <p className="text-sm text-slate-500">No notes for this invoice.</p>)}
-            </div>
-          </div>
+    <div class="layout">
+      <!-- Table -->
+      <div class="card">
+        <div class="table-wrap" id="tableContainer" style="display:none">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:70px">Pos</th>
+                <th style="width:180px">Part Number</th>
+                <th style="width:110px">Quantity</th>
+                <th style="width:80px">Unit</th>
+                <th style="width:120px">Unit Price</th>
+                <th style="width:120px">Line Total</th>
+                <th style="width:120px">Calculated</th>
+                <th style="width:120px">Net Weight</th>
+                <th style="width:110px">Country</th>
+                <th>Description</th>
+                <th style="width:160px">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
         </div>
-      );
+      </div>
+
+      <!-- Notes -->
+      <div class="card">
+        <div class="side">
+          <h3>Notes for selected invoice</h3>
+          <div id="notesPanel"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Debug -->
+    <div id="debug" style="display:none; padding:16px">
+      <div class="card" style="padding:12px">
+        <strong>Debug text (first 1500 chars)</strong>
+        <pre id="debugContent" style="max-height:260px; overflow:auto; background:#fff; padding:12px; border:1px solid #e5e7eb; border-radius:8px"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* -------------------------
+       State
+    ------------------------- */
+    let allData = [];           // flat array of line items (all invoices)
+    let currentInvoice = "";    // selected invoice number
+    const invoiceNotes = {};    // per-invoice notes (filled during parse)
+
+    /* -------------------------
+       Upload wiring
+    ------------------------- */
+    const uploadBox = document.getElementById('uploadBox');
+    const fileInput = document.getElementById('fileInput');
+
+    uploadBox.addEventListener('click', () => fileInput.click());
+    uploadBox.addEventListener('dragover', e => { e.preventDefault(); uploadBox.classList.add('dragover'); });
+    uploadBox.addEventListener('dragleave', () => uploadBox.classList.remove('dragover'));
+    uploadBox.addEventListener('drop', e => {
+      e.preventDefault(); uploadBox.classList.remove('dragover');
+      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+    /* -------------------------
+       Helpers / UI
+    ------------------------- */
+    function money(n){ const v = Number(String(n).replace(/[, ]/g,'')) || 0; return '$' + v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    function showAlert(text,type='error'){
+      const el = document.getElementById('missingItemsAlert');
+      el.style.display = 'block';
+      el.style.borderColor = type==='success' ? '#bbf7d0' : '#fecaca';
+      el.style.background = type==='success' ? '#ecfdf5' : '#fff1f2';
+      el.style.color = type==='success' ? '#065f46' : '#991b1b';
+      document.getElementById('missingItemsText').textContent = text;
+      // auto-hide success
+      if(type==='success'){ setTimeout(()=>{ el.style.display='none'; }, 1800); }
     }
 
-    // ✅ Safe async startup
-    function safeStart() {
-      if (window.React && window.ReactDOM && window.pdfjsLib) {
-        console.log("✅ Starting React app...");
-        ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-      } else {
-        console.warn("⏳ Waiting for dependencies...");
-        setTimeout(safeStart, 300);
+    function setNotes(invoice, list){
+      invoiceNotes[invoice] = invoiceNotes[invoice] || [];
+      invoiceNotes[invoice].push(...list);
+    }
+
+    function renderNotes(){
+      const wrap = document.getElementById('notesPanel');
+      wrap.innerHTML = '';
+      const notes = currentInvoice ? (invoiceNotes[currentInvoice]||[]) : [];
+      if(!notes.length){
+        wrap.innerHTML = '<div class="note">No notes for this invoice.</div>';
+        return;
+      }
+      notes.forEach(n=>{
+        const d = document.createElement('div');
+        d.className = 'note';
+        d.textContent = n;
+        wrap.appendChild(d);
+      });
+    }
+
+    /* -------------------------
+       Robust PDF extraction
+    ------------------------- */
+    async function handleFile(file){
+      if(file.type!=='application/pdf'){ showAlert('Please upload a PDF file'); return; }
+      document.getElementById('uploadSection').style.display='none';
+      document.getElementById('loading').style.display='block';
+
+      try{
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+
+        let text = '';
+        for(let i=1;i<=pdf.numPages;i++){
+          const page = await pdf.getPage(i);
+          const tc = await page.getTextContent();
+          // Use spaces but keep page breaks as \n to aid “block” parsing
+          const pageText = tc.items.map(it => it.str).join(' ');
+          text += pageText + '\n';
+        }
+
+        // Debug
+        const dbg = document.getElementById('debugContent');
+        dbg.textContent = `Pages: ${pdf.numPages}\nTotal chars: ${text.length}\n\n` + text.slice(0,1500);
+        document.getElementById('debug').style.display='none'; // hidden by default
+        document.getElementById('showDebugBtn').onclick = () => {
+          const d = document.getElementById('debug');
+          d.style.display = d.style.display==='none' ? 'block' : 'none';
+        };
+
+        parseInvoices(text);
+
+        if(allData.length){
+          setupInterface();
+          showAlert(`✅ Parsed ${new Set(allData.map(d=>d.invoice_number)).size} invoice(s), ${allData.length} line(s)`, 'success');
+        }else{
+          document.getElementById('uploadSection').style.display='block';
+          document.getElementById('debug').style.display='block';
+          showAlert('No invoice data found. See debug below.');
+        }
+
+      }catch(err){
+        console.error(err);
+        document.getElementById('uploadSection').style.display='block';
+        showAlert('Error: ' + err.message);
+      }finally{
+        document.getElementById('loading').style.display='none';
       }
     }
-    window.addEventListener("load", safeStart);
+
+    /* -------------------------
+       Parsing (improved & tolerant)
+    ------------------------- */
+    function parseInvoices(raw){
+      allData = [];
+      Object.keys(invoiceNotes).forEach(k=>delete invoiceNotes[k]);
+
+      // Normalize repeated spaces
+      let text = raw.replace(/[ \t]+/g,' ');
+
+      // Identify invoice blocks by "Customs Invoice <number>"
+      const invRegex = /Customs\s+Invoice\s+(\d{6,})/gi;
+      const matches = [...text.matchAll(invRegex)];
+      if(!matches.length) return;
+
+      for(let i=0;i<matches.length;i++){
+        const inv = matches[i][1];
+        const start = matches[i].index;
+        const end = (i<matches.length-1) ? matches[i+1].index : text.length;
+        const block = text.slice(start,end);
+
+        // Common metadata
+        const dateMatch = block.match(/from\s+(\d{2}\/\d{2}\/\d{4})/i);
+        const supplierMatch = block.match(/Delivery Address:.*?\n?([A-Za-z0-9 ,.\-()&\/]+)\s*(?:\n|$)/i);
+        const invoiceTotalMatch = block.match(/Total\s+invoice\s+value:\s*([\d,]+\.\d{2})\s*USD/i);
+
+        const invoice_date = dateMatch ? dateMatch[1] : '';
+        const supplier = supplierMatch ? supplierMatch[1].trim() : '';
+        const invoice_total = invoiceTotalMatch ? invoiceTotalMatch[1] : '';
+
+        // Find product “lines”
+        // Pattern looks for: Pos <n> <Product no> ... quantities ... price/unit ... total price USD
+        const lineRegex =
+          /(\d{1,3})\s+([A-Z0-9.\-]+)\s+(\d+(?:\.\d+)?)\s+(?:bucket|barrel|can|can\(s\)|can\(s\)|can\(s\)|can\(s\)|can\(s\)|bucket\(s\)|barrel\(s\)|can\(s\)|can\(s\)|can\(s\)|can\(s\)|barrel\(s\)|bucket\(s\)|can\(s\)|can\(s\)|bucket\(s\)|can\(s\)|can\(s\)|bucket\(s\)|can\(s\)|barrel\(s\)|can\(s\)|bucket\(s\)|can\(s\)|barrel\(s\)|can\(s\)|bucket\(s\)|can\(s\)|bucket\(s\)|can\(s\)|bucket\(s\))?\s*x\s*([\d,.]+)\s+(KG|L|GAL|PT|QT)\s+([\d,.]+)\s+\4\s+([\d,.]+)\s+USD\/(?:KG|L|GAL|CN|PT|QT)\s+([\d,]+\.\d{2})/gi;
+
+        // Fallback looser pattern (covers some wrapped/odd spacing cases)
+        const looseLineRegex =
+          /(\d{1,3})\s+([A-Z0-9.\-]+)[\s\S]{0,120}?x\s*([\d,.]+)\s+(KG|L|GAL|PT|QT)[\s\S]{0,40}?([\d,.]+)\s+\4[\s\S]{0,40}?([\d,.]+)\s+USD\/[A-Z]+[\s\S]{0,30}?([\d,]+\.\d{2})/gi;
+
+        let lines = [];
+        const pushLine = (m) => {
+          const pos = m[1];
+          const part = m[2];
+          const qtyPer = safeNum(m[3]);
+          const unit = m[4];
+          const totalQty = safeNum(m[5]);
+          const unitPrice = safeNum(m[6]);
+          const lineTotal = safeNum(m[7]);
+
+          const item = {
+            invoice_number: inv,
+            invoice_date,
+            invoice_total,
+            supplier,
+            position: pos,
+            part_number: part,
+            quantity: trimZeros(totalQty),
+            unit: unit,
+            unit_price: trimZeros(unitPrice),
+            line_total: trimZeros(lineTotal),
+            net_weight: '', // can be mapped from “Total net steel weight per KG” if needed
+            country_of_origin: '',
+            description: ''
+          };
+
+          // Quantity reconciliation using unit price
+          // If Q * P ≠ line_total, try to infer quantity (rounded or per-piece × count)
+          reconcileQuantity(item);
+
+          // Country of origin (common at end of each block)
+          const coo = block.match(/Country\s+of\s+origin:\s*(?:Federal\s+Republic\s+of\s+)?([A-Za-z]+)/i);
+          if(coo){
+            let c = coo[1].toLowerCase();
+            const map = {germany:'DE', netherlands:'NL', slovenia:'SI', japan:'JP', usa:'US'};
+            item.country_of_origin = map[c] || c.toUpperCase().slice(0,2);
+          }
+
+          lines.push(item);
+        };
+
+        let m;
+        while((m=lineRegex.exec(block))!==null){ pushLine(m); }
+        if(lines.length===0){ // try looser
+          while((m=looseLineRegex.exec(block))!==null){ pushLine(m); }
+        }
+
+        if(lines.length===0){
+          setNotes(inv, ['No line items parsed (PDF line wrapping). Add lines manually with “Insert Below”.']);
+        }
+
+        // Figure “missing positions” (deterministic gaps)
+        const posNums = lines.map(r=>Number(r.position)).filter(n=>Number.isFinite(n)).sort((a,b)=>a-b);
+        const missing = detectMissingPositions(posNums, inv);
+        if(missing.length){
+          setNotes(inv, [`Missing positions detected: ${missing.join(', ')}. Use “Insert Below” to add.`]);
+        }
+
+        allData.push(...lines);
+      }
+    }
+
+    // Convert "1,234.56" -> 1234.56
+    function safeNum(s){ return Number(String(s||'').replace(/[, ]/g,'')) || 0; }
+    function trimZeros(n){ return (Number(n)||0).toString(); }
+
+    // Quantity reconciliation:
+    // Try: 1) direct round, 2) integer close, 3) deduce per-piece × count from surrounding text
+    function reconcileQuantity(item){
+      const q = safeNum(item.quantity);
+      const p = safeNum(item.unit_price);
+      const t = safeNum(item.line_total);
+      if(p>0){
+        const qCalc = t / p;
+        const round2 = Math.round(qCalc*100)/100;
+        const round3 = Math.round(qCalc*1000)/1000;
+
+        // If current q is off by > 1% from either rounded suggestion, pick the closest
+        const off = Math.abs(q*p - t);
+        const offPct = t ? off/t : 0;
+        if(offPct > 0.01){
+          // prefer round3 if it yields exact to cents
+          const err2 = Math.abs(round2*p - t);
+          const err3 = Math.abs(round3*p - t);
+          const chosen = err3 <= err2 ? round3 : round2;
+          if(Math.abs(chosen*p - t) <= Math.max(0.02, t*0.001)){
+            item.quantity = trimZeros(chosen);
+            setNotes(item.invoice_number, [
+              `Adjusted quantity on position ${item.position} from ${q} to ${item.quantity} based on unit price × qty ≈ line total.`
+            ]);
+          }else{
+            // leave but flag mismatch in UI
+            setNotes(item.invoice_number, [
+              `Check quantity on position ${item.position}: qty×price ≠ line total (${q}×${p} vs ${t}).`
+            ]);
+          }
+        }
+      }
+    }
+
+    // Known hard gaps (from prior analysis). Add/adjust as needed.
+    function detectMissingPositions(sortedPositions, invoice){
+      const known = {
+        // example: '90286988': [26, 28, 67],
+      };
+      if(!known[invoice]) return [];
+      const have = new Set(sortedPositions);
+      return known[invoice].filter(n=>!have.has(n));
+    }
+
+    /* -------------------------
+       UI / Rendering
+    ------------------------- */
+    function setupInterface(){
+      // Build invoice select
+      const sel = document.getElementById('invoiceSelect');
+      sel.innerHTML = '<option value="">Select an invoice…</option>';
+      const meta = {};
+      allData.forEach(r=>{
+        if(!meta[r.invoice_number]){
+          meta[r.invoice_number] = {date:r.invoice_date, supplier:r.supplier, total:r.invoice_total};
+        }
+      });
+      Object.keys(meta).forEach(inv=>{
+        const o = document.createElement('option');
+        o.value = inv;
+        const tot = safeNum(meta[inv].total);
+        o.textContent = `Invoice ${inv} — ${meta[inv].date||'-'} — ${meta[inv].supplier||'-'} — ${money(tot)}`;
+        sel.appendChild(o);
+      });
+
+      document.getElementById('controls').style.display='flex';
+
+      sel.onchange = () => {
+        currentInvoice = sel.value;
+        if(currentInvoice){ loadInvoiceData(); }
+        else { hideDataView(); }
+      };
+
+      document.getElementById('exportBtn').onclick = exportToExcel;
+
+      // Auto select the first invoice
+      if(sel.options.length>1){
+        sel.selectedIndex = 1;
+        currentInvoice = sel.value;
+        loadInvoiceData();
+      }
+    }
+
+    function hideDataView(){
+      document.getElementById('stats').style.display='none';
+      document.getElementById('metaGrid').style.display='none';
+      document.getElementById('tableContainer').style.display='none';
+      renderNotes(); // still show notes (probably none)
+    }
+
+    function loadInvoiceData(){
+      const items = allData.filter(d=>d.invoice_number===currentInvoice);
+      if(!items.length){ hideDataView(); return; }
+
+      // Stats
+      const inv = items[0];
+      document.getElementById('statInvoice').textContent = currentInvoice;
+      document.getElementById('statTotal').textContent = money(inv.invoice_total||0);
+      document.getElementById('stats').style.display='grid';
+
+      // Editable meta
+      document.getElementById('metaGrid').style.display='grid';
+      document.getElementById('invoiceDateInput').value = inv.invoice_date || '';
+      document.getElementById('supplierInput').value = inv.supplier || '';
+      document.getElementById('invoiceTotalInput').value = inv.invoice_total || '';
+
+      // Missing positions alert (from detectMissingPositions)
+      const positions = items.map(x=>Number(x.position)).filter(Number.isFinite).sort((a,b)=>a-b);
+      const missing = detectMissingPositions(positions, currentInvoice);
+      const alertDiv = document.getElementById('missingItemsAlert');
+      if(missing.length){
+        document.getElementById('missingItemsText').textContent =
+          `This invoice is missing positions ${missing.join(', ')}. Use “Insert Below” to add them manually.`;
+        alertDiv.style.display='block';
+      }else{
+        alertDiv.style.display='none';
+      }
+
+      // Table
+      document.getElementById('tableContainer').style.display='block';
+      renderTable(items);
+      renderNotes();
+      updateValidation();
+    }
+
+    function renderTable(items){
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+      items.forEach(item => tbody.appendChild(makeRow(item)));
+    }
+
+    function makeRow(item){
+      const tr = document.createElement('tr');
+      const idx = allData.indexOf(item);
+
+      const qty = safeNum(item.quantity);
+      const price = safeNum(item.unit_price);
+      const calc = qty * price;
+      const lineTotal = safeNum(item.line_total);
+      const mismatch = Math.abs(calc - lineTotal) > Math.max(0.02, lineTotal*0.001);
+
+      tr.innerHTML = `
+        <td><input type="text" data-f="position" value="${item.position||''}"></td>
+        <td><input type="text" data-f="part_number" value="${item.part_number||''}"></td>
+        <td><input type="number" step="any" data-f="quantity" value="${item.quantity||''}"></td>
+        <td><input type="text" data-f="unit" value="${item.unit||''}"></td>
+        <td><input type="number" step="any" data-f="unit_price" value="${item.unit_price||''}"></td>
+        <td><input type="number" step="any" data-f="line_total" value="${item.line_total||''}"></td>
+        <td class="calc-cell ${mismatch?'calc-mismatch':''}" title="quantity × unit price">${
+          money(calc)
+        }</td>
+        <td><input type="number" step="any" data-f="net_weight" value="${item.net_weight||''}"></td>
+        <td><input type="text" maxlength="2" data-f="country_of_origin" value="${item.country_of_origin||''}"></td>
+        <td><input type="text" data-f="description" value="${item.description||''}"></td>
+        <td>
+          <button class="btn btn-warning" onclick="insertRowBelow(${idx})">Insert Below</button>
+          <button class="btn btn-danger" onclick="deleteRow(${idx})">Delete</button>
+        </td>
+      `;
+
+      tr.querySelectorAll('input').forEach(inp=>{
+        inp.addEventListener('change', e=>{
+          const f = e.target.dataset.f;
+          const v = e.target.value;
+          updateItem(idx, f, v);
+          // If qty or price or line total changed, try to reconcile
+          if(f==='quantity' || f==='unit_price' || f==='line_total'){
+            reconcileQuantity(allData[idx]);
+          }
+          loadInvoiceData();
+        });
+      });
+
+      return tr;
+    }
+
+    function updateItem(index, field, value){
+      if(!allData[index]) return;
+      if(field==='quantity' || field==='unit_price' || field==='line_total'){
+        allData[index][field] = String(value).trim();
+      }else{
+        allData[index][field] = value;
+      }
+    }
+
+    // Exposed for buttons
+    window.insertRowBelow = function(index){
+      if(!allData[index]) return;
+      const base = allData[index];
+      const newItem = {
+        invoice_number: base.invoice_number,
+        invoice_date: base.invoice_date || '',
+        invoice_total: base.invoice_total || '',
+        supplier: base.supplier || '',
+        position: '',
+        part_number: '',
+        quantity: '0',
+        unit: '',
+        unit_price: '0',
+        line_total: '0',
+        net_weight: '',
+        country_of_origin: '',
+        description: ''
+      };
+      allData.splice(index+1, 0, newItem);
+      showAlert('Row inserted', 'success');
+      loadInvoiceData();
+    };
+
+    window.deleteRow = function(index){
+      const item = allData[index];
+      if(!item) return;
+      if(!confirm('Delete this line item?')) return;
+      allData.splice(index,1);
+      showAlert('Row deleted', 'success');
+      loadInvoiceData();
+    };
+
+    function updateValidation(){
+      const items = allData.filter(r=>r.invoice_number===currentInvoice);
+      if(!items.length) return;
+      const total = safeNum(items[0].invoice_total||0);
+      const sum = items.reduce((a,b)=>a + safeNum(b.line_total), 0);
+      const diff = Math.abs(total - sum);
+      document.getElementById('statTotal').textContent = money(total);
+      document.getElementById('statSum').textContent = money(sum);
+      const d = document.getElementById('statDiff');
+      d.textContent = money(diff);
+      d.classList.toggle('ok', diff < 0.02);
+      d.classList.toggle('error', diff >= 0.02);
+    }
+
+    /* -------------------------
+       Excel export (template-friendly columns)
+    ------------------------- */
+    function exportToExcel(){
+      const scope = currentInvoice ? allData.filter(d=>d.invoice_number===currentInvoice) : allData;
+      if(!scope.length){ showAlert('No data to export'); return; }
+
+      const headers = [
+        'InvoiceNumber','InvoiceDate','InvoiceTotal','SupplierMID','SupplierName',
+        'BuyerPartNumber','SupplierPartNumber','Quantity','UnitOfMeasure','Description',
+        'UnitPrice','ItemTotal','CurrencyCode','ExchangeRate','CountryOfOrigin',
+        'CountryOfExport','DateOfExport','PortOfLading','RelatedParty','PO_Number',
+        'PO_Date','GrossWeight','GrossWeightUnit','NetWeight','TariffNumber',
+        'TariffDescription','Quantity1','UnitOfMeasure1','Quantity2','UnitOfMeasure2',
+        'Quantity3','UnitOfMeasure3','PrimarySPI','SecondarySPI','DeliverTo',
+        'SoldTo','SecondaryTariffNumber'
+      ];
+
+      const rows = [headers];
+      scope.forEach(it=>{
+        const r = new Array(37).fill('');
+        r[0]=it.invoice_number;
+        r[1]=it.invoice_date;
+        r[2]=safeNum(it.invoice_total)||'';
+        r[4]=it.supplier;
+        r[6]=it.part_number;
+        r[7]=safeNum(it.quantity)||'';
+        r[8]=it.unit;
+        r[9]=it.description;
+        r[10]=safeNum(it.unit_price)||'';
+        r[11]=safeNum(it.line_total)||'';
+        r[14]=it.country_of_origin;
+        r[23]=safeNum(it.net_weight)||'';
+        rows.push(r);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+      const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+      XLSX.writeFile(wb, `IES_Template_${currentInvoice||'ALL'}_${ts}.xlsx`);
+      showAlert('Exported to Excel', 'success');
+    }
+
+    /* -------------------------
+       Invoice meta edits apply to all lines of that invoice
+    ------------------------- */
+    document.getElementById('invoiceDateInput').addEventListener('change', ()=>{
+      if(!currentInvoice) return showAlert('Select an invoice first');
+      const v = document.getElementById('invoiceDateInput').value;
+      allData.forEach(d=>{ if(d.invoice_number===currentInvoice) d.invoice_date = v; });
+      loadInvoiceData();
+    });
+    document.getElementById('supplierInput').addEventListener('change', ()=>{
+      if(!currentInvoice) return showAlert('Select an invoice first');
+      const v = document.getElementById('supplierInput').value;
+      allData.forEach(d=>{ if(d.invoice_number===currentInvoice) d.supplier = v; });
+      loadInvoiceData();
+    });
+    document.getElementById('invoiceTotalInput').addEventListener('change', ()=>{
+      if(!currentInvoice) return showAlert('Select an invoice first');
+      const v = document.getElementById('invoiceTotalInput').value;
+      allData.forEach(d=>{ if(d.invoice_number===currentInvoice) d.invoice_total = v; });
+      loadInvoiceData();
+    });
   </script>
 </body>
 </html>
