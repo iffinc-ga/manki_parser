@@ -1,700 +1,694 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MANKI Parser – Stable + Robust Parsing</title>
-
-  <!-- pdf.js (stable) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script>
-    // Configure worker for GitHub Pages / static hosting
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-  </script>
-
-  <!-- SheetJS for export -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-  <style>
-    :root{
-      --indigo:#667eea; --purple:#764ba2; --rose:#ef4444; --emerald:#10b981; --slate:#64748b;
-      --bg:#f5f7fa; --card:#ffffff; --line:#e5e7eb;
-    }
-    *{box-sizing:border-box}
-    body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;
-         background:var(--bg); color:#0f172a}
-    .container{max-width:1600px; margin:0 auto; background:var(--card); border-radius:12px;
-               box-shadow:0 8px 28px rgba(0,0,0,.08); overflow:hidden}
-    .header{
-      position:sticky; top:0; z-index:50; color:#fff; padding:24px 28px;
-      background:linear-gradient(135deg,var(--indigo) 0%,var(--purple) 100%);
-    }
-    .header h1{margin:0 0 6px; font-size:20px}
-    .sub{opacity:.95; font-size:13px}
-
-    .upload{padding:28px}
-    .drop{border:2px dashed #cbd5e1; border-radius:12px; padding:26px; text-align:center;
-          cursor:pointer; transition:.2s; background:#f8fafc}
-    .drop:hover{border-color:var(--indigo); background:#eef2ff}
-    .drop.dragover{background:#e0e7ff; border-color:var(--indigo)}
-    #fileInput{display:none}
-
-    .controls{position:sticky; top:84px; z-index:40; background:#fff;
-              border-top:1px solid var(--line); border-bottom:1px solid var(--line);
-              padding:12px 16px; display:flex; gap:10px; align-items:center}
-    .select{padding:10px; border:1px solid #cbd5e1; border-radius:8px; min-width:380px}
-    .btn{padding:10px 14px; border:0; border-radius:8px; font-weight:600; cursor:pointer}
-    .btn-indigo{background:var(--indigo); color:#fff}
-    .btn-indigo:hover{filter:brightness(.95)}
-    .btn-success{background:var(--emerald); color:#fff}
-    .btn-danger{background:var(--rose); color:#fff}
-    .btn-warning{background:#f59e0b; color:#fff}
-    .btn-ghost{background:#eef2ff; color:#1f2937}
-
-    .stats{position:sticky; top:140px; z-index:30; background:#fffbeb; border-bottom:1px solid #fde68a;
-           display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:10px 16px}
-    .stat{padding:10px 12px; background:#fff; border:1px solid #fde68a; border-radius:10px}
-    .stat-label{font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:.03em}
-    .stat-value{font-weight:700; font-variant-numeric:tabular-nums}
-    .stat-value.error{color:var(--rose)}
-    .stat-value.ok{color:var(--emerald)}
-
-    .layout{display:grid; grid-template-columns:2fr 1fr; gap:16px; padding:16px}
-    .card{background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden}
-    .table-wrap{height:calc(100vh - 320px); overflow:auto}
-    table{width:100%; border-collapse:separate; border-spacing:0}
-    thead th{position:sticky; top:196px; z-index:20; /* sticky table header */
-             background:#f8fafc; border-bottom:1px solid var(--line);
-             text-align:left; font-size:12px; padding:10px; text-transform:uppercase}
-    tbody td{border-bottom:1px solid var(--line); padding:8px 10px; font-size:14px; vertical-align:top}
-    tbody tr:hover{background:#f9fafb}
-    td input[type="text"], td input[type="number"]{
-      width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;
-    }
-    td input[readonly]{background:#f8fafc}
-    .calc-cell{font-variant-numeric:tabular-nums}
-    .calc-mismatch{background:#fff1f2}
-    .alert{display:none; margin:12px 16px 0; padding:10px 12px; border-radius:10px; border:1px solid #fecaca; background:#fff1f2; color:#991b1b; font-size:13px}
-
-    .side{padding:16px; height:calc(100vh - 280px); overflow:auto}
-    .side h3{margin:0 0 10px; font-size:14px; color:#334155}
-    .note{background:#f1f5f9; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; font-size:13px; margin-bottom:8px}
-
-    .loading{display:none; padding:28px; text-align:center}
-    .spinner{border:4px solid #e5e7eb; border-top:4px solid var(--indigo); width:50px; height:50px; border-radius:50%;
-             animation:spin 1s linear infinite; margin:0 auto 10px}
-    @keyframes spin{to{transform:rotate(360deg)}}
-
-    .meta-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:0 16px 12px}
-    .meta-grid input{padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice PDF Parser & Editor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f7fa; padding: 20px; }
+        .container { max-width: 1800px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; }
+        .header h1 { margin-bottom: 8px; }
+        
+        .upload-section { padding: 40px; text-align: center; }
+        .upload-box { border: 3px dashed #cbd5e0; border-radius: 8px; padding: 40px; cursor: pointer; transition: all 0.3s; }
+        .upload-box:hover { border-color: #667eea; background: #f7fafc; }
+        .upload-box.dragover { border-color: #667eea; background: #e6f0ff; }
+        #fileInput { display: none; }
+        
+        .loading { padding: 40px; text-align: center; display: none; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .controls { padding: 20px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; display: none; }
+        .controls select { padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; min-width: 400px; margin-right: 10px; }
+        .controls button { padding: 10px 20px; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; margin-right: 10px; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-primary:hover { background: #0056b3; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-info:hover { background: #138496; }
+        
+        .stats { padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; background: #fff3cd; display: none; }
+        .stat { padding: 15px; background: white; border-radius: 4px; border-left: 4px solid #ffc107; }
+        .stat-label { font-size: 11px; color: #6c757d; text-transform: uppercase; margin-bottom: 5px; }
+        .stat-value { font-size: 20px; font-weight: bold; }
+        .stat-value.error { color: #dc3545; }
+        .stat-value.success { color: #28a745; }
+        .stat input { width: 100%; padding: 6px; border: 1px solid #ced4da; border-radius: 3px; font-size: 16px; font-weight: bold; }
+        .stat.editable { border-left-color: #007bff; }
+        
+        .table-container { padding: 20px; display: none; }
+        .table-header-wrapper { background: #343a40; overflow: hidden; }
+        .table-header { min-width: 1400px; }
+        .table-header table { width: 100%; border-collapse: collapse; }
+        .table-header th { background: #343a40; color: white; padding: 12px 8px; text-align: left; font-weight: 600; font-size: 13px; border: none; }
+        
+        .table-body-wrapper { max-height: 500px; overflow: auto; }
+        .table-body { min-width: 1400px; }
+        .table-body table { width: 100%; border-collapse: collapse; }
+        .table-body td { padding: 10px 8px; border-bottom: 1px solid #dee2e6; background: white; }
+        .table-body tr:hover td { background: #f8f9fa; }
+        .table-body td input { width: 100%; padding: 6px; border: 1px solid #ced4da; border-radius: 3px; font-size: 13px; }
+        .table-body td input:focus { outline: none; border-color: #667eea; }
+        
+        .error-cell { background: #f8d7da !important; }
+        .error-cell input { border-color: #dc3545; }
+        .readonly { background: #e9ecef !important; }
+        .actions { text-align: center; }
+        .actions button { padding: 4px 8px; font-size: 12px; margin: 0 2px; }
+        
+        .alert { padding: 15px; margin: 20px; border-radius: 4px; display: none; }
+        .alert.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>📋 MANKI Parser</h1>
-      <div class="sub">Upload a PDF, pick an invoice, review/fix lines, see notes, and export.</div>
-    </div>
-
-    <!-- Upload -->
-    <div class="upload" id="uploadSection">
-      <div class="drop" id="uploadBox">
-        <strong>Click to choose PDF</strong> or drop it here
-        <input id="fileInput" type="file" accept="application/pdf" />
-      </div>
-    </div>
-
-    <!-- Loading -->
-    <div class="loading" id="loading">
-      <div class="spinner"></div>
-      <div>Extracting text from PDF…</div>
-    </div>
-
-    <!-- Controls -->
-    <div class="controls" id="controls" style="display:none">
-      <select id="invoiceSelect" class="select">
-        <option value="">Select an invoice…</option>
-      </select>
-      <button class="btn btn-indigo" id="exportBtn" title="Export visible invoice (or all, if none selected)">Export to Excel</button>
-      <div style="flex:1"></div>
-      <button class="btn btn-ghost" id="showDebugBtn">Debug</button>
-    </div>
-
-    <!-- Stats -->
-    <div class="stats" id="stats" style="display:none">
-      <div class="stat"><div class="stat-label">Invoice #</div><div class="stat-value" id="statInvoice">–</div></div>
-      <div class="stat"><div class="stat-label">Invoice Total</div><div class="stat-value" id="statTotal">$0.00</div></div>
-      <div class="stat"><div class="stat-label">Line Items Sum</div><div class="stat-value" id="statSum">$0.00</div></div>
-      <div class="stat"><div class="stat-label">Difference</div><div class="stat-value" id="statDiff">$0.00</div></div>
-    </div>
-
-    <!-- Missing positions alert -->
-    <div id="missingItemsAlert" class="alert">
-      <span id="missingItemsText"></span>
-    </div>
-
-    <!-- Editable invoice meta -->
-    <div class="meta-grid" id="metaGrid" style="display:none">
-      <input id="invoiceDateInput" type="text" placeholder="Invoice Date (auto)" />
-      <input id="supplierInput" type="text" placeholder="Supplier (auto)" />
-      <input id="invoiceTotalInput" type="text" placeholder="Invoice Total (auto)" />
-    </div>
-
-    <div class="layout">
-      <!-- Table -->
-      <div class="card">
-        <div class="table-wrap" id="tableContainer" style="display:none">
-          <table>
-            <thead>
-              <tr>
-                <th style="width:70px">Pos</th>
-                <th style="width:180px">Part Number</th>
-                <th style="width:110px">Quantity</th>
-                <th style="width:80px">Unit</th>
-                <th style="width:120px">Unit Price</th>
-                <th style="width:120px">Line Total</th>
-                <th style="width:120px">Calculated</th>
-                <th style="width:120px">Net Weight</th>
-                <th style="width:110px">Country</th>
-                <th>Description</th>
-                <th style="width:160px">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
-          </table>
+    <div class="container">
+        <div class="header">
+            <h1>📄 Invoice PDF Parser & Editor</h1>
+            <p>Upload PDF, select invoice, edit data, and export to Excel</p>
         </div>
-      </div>
-
-      <!-- Notes -->
-      <div class="card">
-        <div class="side">
-          <h3>Notes for selected invoice</h3>
-          <div id="notesPanel"></div>
+        
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-box" id="uploadBox">
+                <h2>📤 Upload PDF Invoice</h2>
+                <p style="margin-top: 10px; color: #6c757d;">Click or drag & drop your PDF file here</p>
+                <input type="file" id="fileInput" accept=".pdf">
+            </div>
         </div>
-      </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div><strong>Processing PDF...</strong></div>
+        </div>
+        
+        <div class="alert" id="alert"></div>
+        
+        <div class="controls" id="controls">
+            <select id="invoiceSelect">
+                <option value="">Select an invoice...</option>
+            </select>
+            <button class="btn-success" onclick="exportToExcel()">📥 Export All to Excel</button>
+            <button class="btn-primary" onclick="resetUpload()">📤 New Upload</button>
+        </div>
+        
+        <div class="stats" id="stats">
+            <div class="stat">
+                <div class="stat-label">Invoice Number</div>
+                <div class="stat-value" id="statInvoice">-</div>
+            </div>
+            <div class="stat editable">
+                <div class="stat-label">Invoice Date (Editable)</div>
+                <input type="text" id="statDate" placeholder="MM/DD/YYYY" onchange="updateInvoiceField('invoice_date', this.value)">
+            </div>
+            <div class="stat editable">
+                <div class="stat-label">Supplier (Editable)</div>
+                <input type="text" id="statSupplier" placeholder="Supplier name" onchange="updateInvoiceField('supplier', this.value)">
+            </div>
+            <div class="stat">
+                <div class="stat-label">Total Line Items</div>
+                <div class="stat-value" id="statItems">0</div>
+            </div>
+            <div class="stat editable">
+                <div class="stat-label">Invoice Total (Editable)</div>
+                <input type="number" step="0.01" id="statTotal" placeholder="0.00" onchange="updateInvoiceTotal(this.value)">
+            </div>
+            <div class="stat">
+                <div class="stat-label">Line Items Sum</div>
+                <div class="stat-value" id="statSum">$0.00</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Difference</div>
+                <div class="stat-value" id="statDiff">$0.00</div>
+            </div>
+        </div>
+        
+        <div class="table-container" id="tableContainer">
+            <div class="table-header-wrapper">
+                <div class="table-header">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">Pos</th>
+                                <th style="width: 150px;">Part Number</th>
+                                <th style="width: 100px;">Quantity</th>
+                                <th style="width: 80px;">Unit</th>
+                                <th style="width: 120px;">Unit Price</th>
+                                <th style="width: 120px;">Line Total</th>
+                                <th style="width: 120px;">Calculated</th>
+                                <th style="width: 120px;">Net Weight</th>
+                                <th style="width: 100px;">Country</th>
+                                <th style="width: 140px;">Actions</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+            <div class="table-body-wrapper">
+                <div class="table-body">
+                    <table>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Debug -->
-    <div id="debug" style="display:none; padding:16px">
-      <div class="card" style="padding:12px">
-        <strong>Debug text (first 1500 chars)</strong>
-        <pre id="debugContent" style="max-height:260px; overflow:auto; background:#fff; padding:12px; border:1px solid #e5e7eb; border-radius:8px"></pre>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    /* -------------------------
-       State
-    ------------------------- */
-    let allData = [];           // flat array of line items (all invoices)
-    let currentInvoice = "";    // selected invoice number
-    const invoiceNotes = {};    // per-invoice notes (filled during parse)
-
-    /* -------------------------
-       Upload wiring
-    ------------------------- */
-    const uploadBox = document.getElementById('uploadBox');
-    const fileInput = document.getElementById('fileInput');
-
-    uploadBox.addEventListener('click', () => fileInput.click());
-    uploadBox.addEventListener('dragover', e => { e.preventDefault(); uploadBox.classList.add('dragover'); });
-    uploadBox.addEventListener('dragleave', () => uploadBox.classList.remove('dragover'));
-    uploadBox.addEventListener('drop', e => {
-      e.preventDefault(); uploadBox.classList.remove('dragover');
-      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-    });
-    fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
-
-    /* -------------------------
-       Helpers / UI
-    ------------------------- */
-    function money(n){ const v = Number(String(n).replace(/[, ]/g,'')) || 0; return '$' + v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-    function showAlert(text,type='error'){
-      const el = document.getElementById('missingItemsAlert');
-      el.style.display = 'block';
-      el.style.borderColor = type==='success' ? '#bbf7d0' : '#fecaca';
-      el.style.background = type==='success' ? '#ecfdf5' : '#fff1f2';
-      el.style.color = type==='success' ? '#065f46' : '#991b1b';
-      document.getElementById('missingItemsText').textContent = text;
-      // auto-hide success
-      if(type==='success'){ setTimeout(()=>{ el.style.display='none'; }, 1800); }
-    }
-
-    function setNotes(invoice, list){
-      invoiceNotes[invoice] = invoiceNotes[invoice] || [];
-      invoiceNotes[invoice].push(...list);
-    }
-
-    function renderNotes(){
-      const wrap = document.getElementById('notesPanel');
-      wrap.innerHTML = '';
-      const notes = currentInvoice ? (invoiceNotes[currentInvoice]||[]) : [];
-      if(!notes.length){
-        wrap.innerHTML = '<div class="note">No notes for this invoice.</div>';
-        return;
-      }
-      notes.forEach(n=>{
-        const d = document.createElement('div');
-        d.className = 'note';
-        d.textContent = n;
-        wrap.appendChild(d);
-      });
-    }
-
-    /* -------------------------
-       Robust PDF extraction
-    ------------------------- */
-    async function handleFile(file){
-      if(file.type!=='application/pdf'){ showAlert('Please upload a PDF file'); return; }
-      document.getElementById('uploadSection').style.display='none';
-      document.getElementById('loading').style.display='block';
-
-      try{
-        const buf = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({data:buf}).promise;
-
-        let text = '';
-        for(let i=1;i<=pdf.numPages;i++){
-          const page = await pdf.getPage(i);
-          const tc = await page.getTextContent();
-          // Use spaces but keep page breaks as \n to aid “block” parsing
-          const pageText = tc.items.map(it => it.str).join(' ');
-          text += pageText + '\n';
-        }
-
-        // Debug
-        const dbg = document.getElementById('debugContent');
-        dbg.textContent = `Pages: ${pdf.numPages}\nTotal chars: ${text.length}\n\n` + text.slice(0,1500);
-        document.getElementById('debug').style.display='none'; // hidden by default
-        document.getElementById('showDebugBtn').onclick = () => {
-          const d = document.getElementById('debug');
-          d.style.display = d.style.display==='none' ? 'block' : 'none';
-        };
-
-        parseInvoices(text);
-
-        if(allData.length){
-          setupInterface();
-          showAlert(`✅ Parsed ${new Set(allData.map(d=>d.invoice_number)).size} invoice(s), ${allData.length} line(s)`, 'success');
-        }else{
-          document.getElementById('uploadSection').style.display='block';
-          document.getElementById('debug').style.display='block';
-          showAlert('No invoice data found. See debug below.');
-        }
-
-      }catch(err){
-        console.error(err);
-        document.getElementById('uploadSection').style.display='block';
-        showAlert('Error: ' + err.message);
-      }finally{
-        document.getElementById('loading').style.display='none';
-      }
-    }
-
-    /* -------------------------
-       Parsing (improved & tolerant)
-    ------------------------- */
-    function parseInvoices(raw){
-      allData = [];
-      Object.keys(invoiceNotes).forEach(k=>delete invoiceNotes[k]);
-
-      // Normalize repeated spaces
-      let text = raw.replace(/[ \t]+/g,' ');
-
-      // Identify invoice blocks by "Customs Invoice <number>"
-      const invRegex = /Customs\s+Invoice\s+(\d{6,})/gi;
-      const matches = [...text.matchAll(invRegex)];
-      if(!matches.length) return;
-
-      for(let i=0;i<matches.length;i++){
-        const inv = matches[i][1];
-        const start = matches[i].index;
-        const end = (i<matches.length-1) ? matches[i+1].index : text.length;
-        const block = text.slice(start,end);
-
-        // Common metadata
-        const dateMatch = block.match(/from\s+(\d{2}\/\d{2}\/\d{4})/i);
-        const supplierMatch = block.match(/Delivery Address:.*?\n?([A-Za-z0-9 ,.\-()&\/]+)\s*(?:\n|$)/i);
-        const invoiceTotalMatch = block.match(/Total\s+invoice\s+value:\s*([\d,]+\.\d{2})\s*USD/i);
-
-        const invoice_date = dateMatch ? dateMatch[1] : '';
-        const supplier = supplierMatch ? supplierMatch[1].trim() : '';
-        const invoice_total = invoiceTotalMatch ? invoiceTotalMatch[1] : '';
-
-        // Find product “lines”
-        // Pattern looks for: Pos <n> <Product no> ... quantities ... price/unit ... total price USD
-        const lineRegex =
-          /(\d{1,3})\s+([A-Z0-9.\-]+)\s+(\d+(?:\.\d+)?)\s+(?:bucket|barrel|can|can\(s\)|can\(s\)|can\(s\)|can\(s\)|can\(s\)|bucket\(s\)|barrel\(s\)|can\(s\)|can\(s\)|can\(s\)|can\(s\)|barrel\(s\)|bucket\(s\)|can\(s\)|can\(s\)|bucket\(s\)|can\(s\)|can\(s\)|bucket\(s\)|can\(s\)|barrel\(s\)|can\(s\)|bucket\(s\)|can\(s\)|barrel\(s\)|can\(s\)|bucket\(s\)|can\(s\)|bucket\(s\)|can\(s\)|bucket\(s\))?\s*x\s*([\d,.]+)\s+(KG|L|GAL|PT|QT)\s+([\d,.]+)\s+\4\s+([\d,.]+)\s+USD\/(?:KG|L|GAL|CN|PT|QT)\s+([\d,]+\.\d{2})/gi;
-
-        // Fallback looser pattern (covers some wrapped/odd spacing cases)
-        const looseLineRegex =
-          /(\d{1,3})\s+([A-Z0-9.\-]+)[\s\S]{0,120}?x\s*([\d,.]+)\s+(KG|L|GAL|PT|QT)[\s\S]{0,40}?([\d,.]+)\s+\4[\s\S]{0,40}?([\d,.]+)\s+USD\/[A-Z]+[\s\S]{0,30}?([\d,]+\.\d{2})/gi;
-
-        let lines = [];
-        const pushLine = (m) => {
-          const pos = m[1];
-          const part = m[2];
-          const qtyPer = safeNum(m[3]);
-          const unit = m[4];
-          const totalQty = safeNum(m[5]);
-          const unitPrice = safeNum(m[6]);
-          const lineTotal = safeNum(m[7]);
-
-          const item = {
-            invoice_number: inv,
-            invoice_date,
-            invoice_total,
-            supplier,
-            position: pos,
-            part_number: part,
-            quantity: trimZeros(totalQty),
-            unit: unit,
-            unit_price: trimZeros(unitPrice),
-            line_total: trimZeros(lineTotal),
-            net_weight: '', // can be mapped from “Total net steel weight per KG” if needed
-            country_of_origin: '',
-            description: ''
-          };
-
-          // Quantity reconciliation using unit price
-          // If Q * P ≠ line_total, try to infer quantity (rounded or per-piece × count)
-          reconcileQuantity(item);
-
-          // Country of origin (common at end of each block)
-          const coo = block.match(/Country\s+of\s+origin:\s*(?:Federal\s+Republic\s+of\s+)?([A-Za-z]+)/i);
-          if(coo){
-            let c = coo[1].toLowerCase();
-            const map = {germany:'DE', netherlands:'NL', slovenia:'SI', japan:'JP', usa:'US'};
-            item.country_of_origin = map[c] || c.toUpperCase().slice(0,2);
-          }
-
-          lines.push(item);
-        };
-
-        let m;
-        while((m=lineRegex.exec(block))!==null){ pushLine(m); }
-        if(lines.length===0){ // try looser
-          while((m=looseLineRegex.exec(block))!==null){ pushLine(m); }
-        }
-
-        if(lines.length===0){
-          setNotes(inv, ['No line items parsed (PDF line wrapping). Add lines manually with “Insert Below”.']);
-        }
-
-        // Figure “missing positions” (deterministic gaps)
-        const posNums = lines.map(r=>Number(r.position)).filter(n=>Number.isFinite(n)).sort((a,b)=>a-b);
-        const missing = detectMissingPositions(posNums, inv);
-        if(missing.length){
-          setNotes(inv, [`Missing positions detected: ${missing.join(', ')}. Use “Insert Below” to add.`]);
-        }
-
-        allData.push(...lines);
-      }
-    }
-
-    // Convert "1,234.56" -> 1234.56
-    function safeNum(s){ return Number(String(s||'').replace(/[, ]/g,'')) || 0; }
-    function trimZeros(n){ return (Number(n)||0).toString(); }
-
-    // Quantity reconciliation:
-    // Try: 1) direct round, 2) integer close, 3) deduce per-piece × count from surrounding text
-    function reconcileQuantity(item){
-      const q = safeNum(item.quantity);
-      const p = safeNum(item.unit_price);
-      const t = safeNum(item.line_total);
-      if(p>0){
-        const qCalc = t / p;
-        const round2 = Math.round(qCalc*100)/100;
-        const round3 = Math.round(qCalc*1000)/1000;
-
-        // If current q is off by > 1% from either rounded suggestion, pick the closest
-        const off = Math.abs(q*p - t);
-        const offPct = t ? off/t : 0;
-        if(offPct > 0.01){
-          // prefer round3 if it yields exact to cents
-          const err2 = Math.abs(round2*p - t);
-          const err3 = Math.abs(round3*p - t);
-          const chosen = err3 <= err2 ? round3 : round2;
-          if(Math.abs(chosen*p - t) <= Math.max(0.02, t*0.001)){
-            item.quantity = trimZeros(chosen);
-            setNotes(item.invoice_number, [
-              `Adjusted quantity on position ${item.position} from ${q} to ${item.quantity} based on unit price × qty ≈ line total.`
-            ]);
-          }else{
-            // leave but flag mismatch in UI
-            setNotes(item.invoice_number, [
-              `Check quantity on position ${item.position}: qty×price ≠ line total (${q}×${p} vs ${t}).`
-            ]);
-          }
-        }
-      }
-    }
-
-    // Known hard gaps (from prior analysis). Add/adjust as needed.
-    function detectMissingPositions(sortedPositions, invoice){
-      const known = {
-        // example: '90286988': [26, 28, 67],
-      };
-      if(!known[invoice]) return [];
-      const have = new Set(sortedPositions);
-      return known[invoice].filter(n=>!have.has(n));
-    }
-
-    /* -------------------------
-       UI / Rendering
-    ------------------------- */
-    function setupInterface(){
-      // Build invoice select
-      const sel = document.getElementById('invoiceSelect');
-      sel.innerHTML = '<option value="">Select an invoice…</option>';
-      const meta = {};
-      allData.forEach(r=>{
-        if(!meta[r.invoice_number]){
-          meta[r.invoice_number] = {date:r.invoice_date, supplier:r.supplier, total:r.invoice_total};
-        }
-      });
-      Object.keys(meta).forEach(inv=>{
-        const o = document.createElement('option');
-        o.value = inv;
-        const tot = safeNum(meta[inv].total);
-        o.textContent = `Invoice ${inv} — ${meta[inv].date||'-'} — ${meta[inv].supplier||'-'} — ${money(tot)}`;
-        sel.appendChild(o);
-      });
-
-      document.getElementById('controls').style.display='flex';
-
-      sel.onchange = () => {
-        currentInvoice = sel.value;
-        if(currentInvoice){ loadInvoiceData(); }
-        else { hideDataView(); }
-      };
-
-      document.getElementById('exportBtn').onclick = exportToExcel;
-
-      // Auto select the first invoice
-      if(sel.options.length>1){
-        sel.selectedIndex = 1;
-        currentInvoice = sel.value;
-        loadInvoiceData();
-      }
-    }
-
-    function hideDataView(){
-      document.getElementById('stats').style.display='none';
-      document.getElementById('metaGrid').style.display='none';
-      document.getElementById('tableContainer').style.display='none';
-      renderNotes(); // still show notes (probably none)
-    }
-
-    function loadInvoiceData(){
-      const items = allData.filter(d=>d.invoice_number===currentInvoice);
-      if(!items.length){ hideDataView(); return; }
-
-      // Stats
-      const inv = items[0];
-      document.getElementById('statInvoice').textContent = currentInvoice;
-      document.getElementById('statTotal').textContent = money(inv.invoice_total||0);
-      document.getElementById('stats').style.display='grid';
-
-      // Editable meta
-      document.getElementById('metaGrid').style.display='grid';
-      document.getElementById('invoiceDateInput').value = inv.invoice_date || '';
-      document.getElementById('supplierInput').value = inv.supplier || '';
-      document.getElementById('invoiceTotalInput').value = inv.invoice_total || '';
-
-      // Missing positions alert (from detectMissingPositions)
-      const positions = items.map(x=>Number(x.position)).filter(Number.isFinite).sort((a,b)=>a-b);
-      const missing = detectMissingPositions(positions, currentInvoice);
-      const alertDiv = document.getElementById('missingItemsAlert');
-      if(missing.length){
-        document.getElementById('missingItemsText').textContent =
-          `This invoice is missing positions ${missing.join(', ')}. Use “Insert Below” to add them manually.`;
-        alertDiv.style.display='block';
-      }else{
-        alertDiv.style.display='none';
-      }
-
-      // Table
-      document.getElementById('tableContainer').style.display='block';
-      renderTable(items);
-      renderNotes();
-      updateValidation();
-    }
-
-    function renderTable(items){
-      const tbody = document.getElementById('tableBody');
-      tbody.innerHTML = '';
-      items.forEach(item => tbody.appendChild(makeRow(item)));
-    }
-
-    function makeRow(item){
-      const tr = document.createElement('tr');
-      const idx = allData.indexOf(item);
-
-      const qty = safeNum(item.quantity);
-      const price = safeNum(item.unit_price);
-      const calc = qty * price;
-      const lineTotal = safeNum(item.line_total);
-      const mismatch = Math.abs(calc - lineTotal) > Math.max(0.02, lineTotal*0.001);
-
-      tr.innerHTML = `
-        <td><input type="text" data-f="position" value="${item.position||''}"></td>
-        <td><input type="text" data-f="part_number" value="${item.part_number||''}"></td>
-        <td><input type="number" step="any" data-f="quantity" value="${item.quantity||''}"></td>
-        <td><input type="text" data-f="unit" value="${item.unit||''}"></td>
-        <td><input type="number" step="any" data-f="unit_price" value="${item.unit_price||''}"></td>
-        <td><input type="number" step="any" data-f="line_total" value="${item.line_total||''}"></td>
-        <td class="calc-cell ${mismatch?'calc-mismatch':''}" title="quantity × unit price">${
-          money(calc)
-        }</td>
-        <td><input type="number" step="any" data-f="net_weight" value="${item.net_weight||''}"></td>
-        <td><input type="text" maxlength="2" data-f="country_of_origin" value="${item.country_of_origin||''}"></td>
-        <td><input type="text" data-f="description" value="${item.description||''}"></td>
-        <td>
-          <button class="btn btn-warning" onclick="insertRowBelow(${idx})">Insert Below</button>
-          <button class="btn btn-danger" onclick="deleteRow(${idx})">Delete</button>
-        </td>
-      `;
-
-      tr.querySelectorAll('input').forEach(inp=>{
-        inp.addEventListener('change', e=>{
-          const f = e.target.dataset.f;
-          const v = e.target.value;
-          updateItem(idx, f, v);
-          // If qty or price or line total changed, try to reconcile
-          if(f==='quantity' || f==='unit_price' || f==='line_total'){
-            reconcileQuantity(allData[idx]);
-          }
-          loadInvoiceData();
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        let allData = [];
+        let currentInvoice = '';
+        
+        // Setup upload
+        document.getElementById('uploadBox').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
         });
-      });
-
-      return tr;
-    }
-
-    function updateItem(index, field, value){
-      if(!allData[index]) return;
-      if(field==='quantity' || field==='unit_price' || field==='line_total'){
-        allData[index][field] = String(value).trim();
-      }else{
-        allData[index][field] = value;
-      }
-    }
-
-    // Exposed for buttons
-    window.insertRowBelow = function(index){
-      if(!allData[index]) return;
-      const base = allData[index];
-      const newItem = {
-        invoice_number: base.invoice_number,
-        invoice_date: base.invoice_date || '',
-        invoice_total: base.invoice_total || '',
-        supplier: base.supplier || '',
-        position: '',
-        part_number: '',
-        quantity: '0',
-        unit: '',
-        unit_price: '0',
-        line_total: '0',
-        net_weight: '',
-        country_of_origin: '',
-        description: ''
-      };
-      allData.splice(index+1, 0, newItem);
-      showAlert('Row inserted', 'success');
-      loadInvoiceData();
-    };
-
-    window.deleteRow = function(index){
-      const item = allData[index];
-      if(!item) return;
-      if(!confirm('Delete this line item?')) return;
-      allData.splice(index,1);
-      showAlert('Row deleted', 'success');
-      loadInvoiceData();
-    };
-
-    function updateValidation(){
-      const items = allData.filter(r=>r.invoice_number===currentInvoice);
-      if(!items.length) return;
-      const total = safeNum(items[0].invoice_total||0);
-      const sum = items.reduce((a,b)=>a + safeNum(b.line_total), 0);
-      const diff = Math.abs(total - sum);
-      document.getElementById('statTotal').textContent = money(total);
-      document.getElementById('statSum').textContent = money(sum);
-      const d = document.getElementById('statDiff');
-      d.textContent = money(diff);
-      d.classList.toggle('ok', diff < 0.02);
-      d.classList.toggle('error', diff >= 0.02);
-    }
-
-    /* -------------------------
-       Excel export (template-friendly columns)
-    ------------------------- */
-    function exportToExcel(){
-      const scope = currentInvoice ? allData.filter(d=>d.invoice_number===currentInvoice) : allData;
-      if(!scope.length){ showAlert('No data to export'); return; }
-
-      const headers = [
-        'InvoiceNumber','InvoiceDate','InvoiceTotal','SupplierMID','SupplierName',
-        'BuyerPartNumber','SupplierPartNumber','Quantity','UnitOfMeasure','Description',
-        'UnitPrice','ItemTotal','CurrencyCode','ExchangeRate','CountryOfOrigin',
-        'CountryOfExport','DateOfExport','PortOfLading','RelatedParty','PO_Number',
-        'PO_Date','GrossWeight','GrossWeightUnit','NetWeight','TariffNumber',
-        'TariffDescription','Quantity1','UnitOfMeasure1','Quantity2','UnitOfMeasure2',
-        'Quantity3','UnitOfMeasure3','PrimarySPI','SecondarySPI','DeliverTo',
-        'SoldTo','SecondaryTariffNumber'
-      ];
-
-      const rows = [headers];
-      scope.forEach(it=>{
-        const r = new Array(37).fill('');
-        r[0]=it.invoice_number;
-        r[1]=it.invoice_date;
-        r[2]=safeNum(it.invoice_total)||'';
-        r[4]=it.supplier;
-        r[6]=it.part_number;
-        r[7]=safeNum(it.quantity)||'';
-        r[8]=it.unit;
-        r[9]=it.description;
-        r[10]=safeNum(it.unit_price)||'';
-        r[11]=safeNum(it.line_total)||'';
-        r[14]=it.country_of_origin;
-        r[23]=safeNum(it.net_weight)||'';
-        rows.push(r);
-      });
-
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-      const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-      XLSX.writeFile(wb, `IES_Template_${currentInvoice||'ALL'}_${ts}.xlsx`);
-      showAlert('Exported to Excel', 'success');
-    }
-
-    /* -------------------------
-       Invoice meta edits apply to all lines of that invoice
-    ------------------------- */
-    document.getElementById('invoiceDateInput').addEventListener('change', ()=>{
-      if(!currentInvoice) return showAlert('Select an invoice first');
-      const v = document.getElementById('invoiceDateInput').value;
-      allData.forEach(d=>{ if(d.invoice_number===currentInvoice) d.invoice_date = v; });
-      loadInvoiceData();
-    });
-    document.getElementById('supplierInput').addEventListener('change', ()=>{
-      if(!currentInvoice) return showAlert('Select an invoice first');
-      const v = document.getElementById('supplierInput').value;
-      allData.forEach(d=>{ if(d.invoice_number===currentInvoice) d.supplier = v; });
-      loadInvoiceData();
-    });
-    document.getElementById('invoiceTotalInput').addEventListener('change', ()=>{
-      if(!currentInvoice) return showAlert('Select an invoice first');
-      const v = document.getElementById('invoiceTotalInput').value;
-      allData.forEach(d=>{ if(d.invoice_number===currentInvoice) d.invoice_total = v; });
-      loadInvoiceData();
-    });
-  </script>
+        
+        document.getElementById('fileInput').addEventListener('change', e => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        });
+        
+        const uploadBox = document.getElementById('uploadBox');
+        uploadBox.addEventListener('dragover', e => {
+            e.preventDefault();
+            uploadBox.classList.add('dragover');
+        });
+        uploadBox.addEventListener('dragleave', () => uploadBox.classList.remove('dragover'));
+        uploadBox.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+        });
+        
+        async function handleFile(file) {
+            if (file.type !== 'application/pdf') {
+                showAlert('Please upload a PDF file', 'error');
+                return;
+            }
+            
+            document.getElementById('uploadSection').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                
+                let fullText = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    fullText += pageText + '\n';
+                }
+                
+                parseInvoices(fullText);
+                
+                if (allData.length > 0) {
+                    const invoiceCount = new Set(allData.map(d => d.invoice_number)).size;
+                    showAlert(`✅ Found ${invoiceCount} invoice(s) with ${allData.length} line items`, 'success');
+                    setupInterface();
+                } else {
+                    showAlert('⚠️ No invoice data found in PDF.', 'error');
+                    document.getElementById('uploadSection').style.display = 'block';
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+                document.getElementById('uploadSection').style.display = 'block';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        function parseInvoices(text) {
+            allData = [];
+            
+            // Split text into invoice sections
+            // Look for "Customs Invoice" followed by invoice number "from" date
+            const splits = text.split(/Customs\s+Invoice\s+(\d+)\s+from/gi);
+            
+            // Group sections by invoice number (multi-page invoices have duplicate headers)
+            const invoiceGroups = {};
+            
+            for (let i = 1; i < splits.length; i += 2) {
+                const invoiceNum = splits[i];
+                const sectionText = splits[i + 1];
+                
+                if (!invoiceNum || !sectionText) continue;
+                
+                // Combine all sections with the same invoice number
+                if (!invoiceGroups[invoiceNum]) {
+                    invoiceGroups[invoiceNum] = '';
+                }
+                invoiceGroups[invoiceNum] += sectionText + '\n';
+            }
+            
+            // Process each unique invoice
+            Object.keys(invoiceGroups).forEach(invoiceNum => {
+                const sectionText = invoiceGroups[invoiceNum];
+                
+                console.log(`\n=== PROCESSING INVOICE ${invoiceNum} ===`);
+                console.log('First 600 chars:', sectionText.substring(0, 600));
+                console.log('Last 600 chars:', sectionText.substring(sectionText.length - 600));
+                
+                // Extract invoice metadata
+                // Since we split on "from", the date should be right at the start
+                const dateMatch = sectionText.match(/^\s*(\d{2}\/\d{2}\/\d{4})/);
+                const invoiceDate = dateMatch ? dateMatch[1] : '';
+                console.log('Invoice Date:', invoiceDate);
+                
+                // FIXED: Get supplier - extract the company name that appears BEFORE "Mankiewicz Coatings"
+                const firstPart = sectionText.substring(0, 800);
+                let supplier = '';
+                
+                console.log('Searching for supplier in first 800 chars...');
+                
+                // Look for the supplier line which comes before "Mankiewicz Coatings, LLC"
+                // Pattern: Company name followed by address info before Mankiewicz
+                const supplierPattern = /(Rüdt Industrielacke GmbH & Co\. KG|Norix Lackf?abrik GmbH & Co\. KG|Finalin GmbH & Co\. KG)/i;
+                const supplierMatch = firstPart.match(supplierPattern);
+                
+                if (supplierMatch) {
+                    supplier = supplierMatch[1].trim();
+                    // Clean up common variations
+                    if (supplier.includes('Lackf')) {
+                        supplier = 'Norix Lackfabrik GmbH & Co. KG';
+                    }
+                    console.log('Supplier found:', supplier);
+                } else {
+                    console.warn('Supplier NOT found with pattern. Trying fallback...');
+                    // Fallback to simple matching
+                    if (firstPart.includes('Rüdt') || firstPart.includes('Rudt')) {
+                        supplier = 'Rüdt Industrielacke GmbH & Co. KG';
+                    } else if (firstPart.includes('Norix') || firstPart.includes('Lackf')) {
+                        supplier = 'Norix Lackfabrik GmbH & Co. KG';
+                    } else if (firstPart.includes('Finalin')) {
+                        supplier = 'Finalin GmbH & Co. KG';
+                    }
+                    console.log('Supplier from fallback:', supplier || 'NONE');
+                }
+                
+                // FIXED: Get invoice total - be VERY flexible with whitespace and format
+                let invoiceTotal = '';
+                
+                // Get the last part of the section where totals appear (last 1000 chars)
+                const endSection = sectionText.substring(sectionText.length - 1000);
+                
+                // Pattern 1: Overall amount in USD - very flexible whitespace
+                const overallPattern = /Overall\s+amount\s+in\s+USD\s+([\d,]+\.?\d*)/gi;
+                let overallMatches = [...sectionText.matchAll(overallPattern)];
+                if (overallMatches.length > 0) {
+                    // Get the last match (should be the final total)
+                    invoiceTotal = overallMatches[overallMatches.length - 1][1].replace(/,/g, '');
+                    console.log(`Invoice ${invoiceNum}: Found total via Overall amount: ${invoiceTotal}`);
+                }
+                
+                // Pattern 2: Total net amount
+                if (!invoiceTotal) {
+                    const totalNetPattern = /Total\s+net\s+amount\s+([\d,]+\.?\d*)/gi;
+                    let totalNetMatches = [...sectionText.matchAll(totalNetPattern)];
+                    if (totalNetMatches.length > 0) {
+                        invoiceTotal = totalNetMatches[totalNetMatches.length - 1][1].replace(/,/g, '');
+                        console.log(`Invoice ${invoiceNum}: Found total via Total net amount: ${invoiceTotal}`);
+                    }
+                }
+                
+                // Pattern 3: VAT (USD) followed by total amount
+                if (!invoiceTotal) {
+                    const vatPattern = /VAT\s*\(\s*USD\s*\)\s+([\d,]+\.?\d*)\s+[\d.]+\s*%/gi;
+                    let vatMatches = [...sectionText.matchAll(vatPattern)];
+                    if (vatMatches.length > 0) {
+                        invoiceTotal = vatMatches[vatMatches.length - 1][1].replace(/,/g, '');
+                        console.log(`Invoice ${invoiceNum}: Found total via VAT: ${invoiceTotal}`);
+                    }
+                }
+                
+                // Pattern 4: Look for number pattern after "Overall amount in USD" even if split
+                if (!invoiceTotal) {
+                    const splitPattern = /Overall[^0-9]+([\d,]+\.?\d*)/gi;
+                    let splitMatches = [...endSection.matchAll(splitPattern)];
+                    if (splitMatches.length > 0) {
+                        invoiceTotal = splitMatches[splitMatches.length - 1][1].replace(/,/g, '');
+                        console.log(`Invoice ${invoiceNum}: Found total via split Overall pattern: ${invoiceTotal}`);
+                    }
+                }
+                
+                if (!invoiceTotal) {
+                    console.warn(`Invoice ${invoiceNum}: Could not find invoice total!`);
+                    console.log('Last 800 chars:', sectionText.substring(sectionText.length - 800));
+                }
+                
+                // Track positions to avoid duplicates
+                const positionsFound = new Set();
+                const lineItems = [];
+                
+                // FIXED: Parse line items - the PRICE UNIT determines which quantity to use
+                // Rule: If price is USD/KG, use KG quantity. If USD/CN, use can quantity, etc.
+                // Example 1: "20 H5390.6119.0.170 1.0 bucket (s) x 5.000 KG 5.000 KG 14.97600 USD/KG 74.88"
+                //   Price is USD/KG → use qty=5.000, unit=KG
+                // Example 2: "22 34586.0000.0.561 15.0 can(s) x 0.712 PT 10.680 PT 10.69067 USD/CN 160.36"
+                //   Price is USD/CN → use qty=15.0, unit=CN
+                
+                // Pattern: POS PARTNUM CONTAINER_QTY CONTAINER_TYPE x PER_UNIT UNIT TOTAL_QTY UNIT PRICE USD/UNIT TOTAL
+                const linePattern = /(\d+)\s+([A-Z0-9]+\.[A-Z0-9\.]+)\s+([\d,]+\.?\d*)\s+(carton|bucket|pail|tin|can|barrel|canister|cartridge|piece|Kilogramme)\s*\([^\)]*\)\s*x\s*([\d,]+\.?\d+)\s+([A-Z]+)\s+([\d,]+\.?\d+)\s+([A-Z]+)\s+([\d\.]+)\s+USD\/(FOZ|KG|GAL|QT|PT|CN|PC|L|CAT)\s+([\d,]+\.?\d+)/gi;
+                
+                let match;
+                while ((match = linePattern.exec(sectionText)) !== null) {
+                    const position = match[1];
+                    
+                    if (positionsFound.has(position)) continue;
+                    positionsFound.add(position);
+                    
+                    const partNumber = match[2].substring(0, 5);
+                    const containerQty = match[3].replace(/,/g, ''); // Number of containers (e.g., 15.0 cans)
+                    const containerType = match[4]; // e.g., "can", "bucket"
+                    const perUnitQty = match[5].replace(/,/g, ''); // Per container (e.g., 0.712 PT per can)
+                    const perUnitType = match[6]; // Unit of per-container measure
+                    const totalQty = match[7].replace(/,/g, ''); // Total (e.g., 10.680 PT total)
+                    const totalUnit = match[8]; // Unit of total
+                    const unitPrice = match[9];
+                    const priceUnit = match[10]; // The key: USD/KG, USD/CN, etc.
+                    const lineTotal = match[11].replace(/,/g, '');
+                    const matchIndex = match.index;
+                    
+                    // Determine quantity and unit based on price unit
+                    let quantity, unit;
+                    
+                    // If price is per container (CN, PC, CAT), use container quantity
+                    if (priceUnit === 'CN' || priceUnit === 'PC' || priceUnit === 'CAT') {
+                        quantity = containerQty;
+                        unit = priceUnit;
+                    }
+                    // If price is per weight/volume (KG, GAL, PT, QT, FOZ, L), use total quantity
+                    else if (priceUnit === 'KG' || priceUnit === 'GAL' || priceUnit === 'PT' || 
+                             priceUnit === 'QT' || priceUnit === 'FOZ' || priceUnit === 'L') {
+                        quantity = totalQty;
+                        unit = priceUnit;
+                    }
+                    // Fallback: try to match price unit with total unit
+                    else if (priceUnit === totalUnit) {
+                        quantity = totalQty;
+                        unit = priceUnit;
+                    }
+                    // Last resort
+                    else {
+                        quantity = totalQty;
+                        unit = priceUnit;
+                    }
+                    
+                    lineItems.push({
+                        invoice_number: invoiceNum,
+                        invoice_date: invoiceDate,
+                        invoice_total: invoiceTotal,
+                        supplier: supplier,
+                        position: position,
+                        part_number: partNumber,
+                        quantity: quantity,
+                        unit: unit,
+                        unit_price: unitPrice,
+                        line_total: lineTotal,
+                        net_weight: '',
+                        country_of_origin: '',
+                        matchIndex: matchIndex
+                    });
+                }
+                
+                // Improved net weight and country extraction
+                lineItems.forEach((item, idx) => {
+                    const startPos = item.matchIndex;
+                    const endPos = idx < lineItems.length - 1 ? lineItems[idx + 1].matchIndex : startPos + 3000;
+                    const itemSection = sectionText.substring(startPos, endPos);
+                    
+                    // Look for weight pattern: X.XXX L Y.YYY L
+                    const weightMatch = itemSection.match(/([\d,]+\.?\d+)\s+L\s+([\d,]+\.?\d+)\s+L/);
+                    if (weightMatch) {
+                        item.net_weight = weightMatch[2].replace(/,/g, '');
+                    }
+                    
+                    // Look for "Country of origin:" 
+                    let countryMatch = itemSection.match(/Country\s+of\s+origin:\s*(?:Federal\s+Republic\s+of\s+)?(\w+)/i);
+                    
+                    if (countryMatch) {
+                        let country = countryMatch[1];
+                        if (country.toLowerCase() === 'germany') country = 'DE';
+                        else if (country.toLowerCase() === 'japan') country = 'JP';
+                        else if (country.toLowerCase() === 'netherlands') country = 'NL';
+                        item.country_of_origin = country;
+                    }
+                    
+                    delete item.matchIndex;
+                });
+                
+                allData.push(...lineItems);
+            });
+            
+            console.log('Parsed data:', allData);
+        }
+        
+        function setupInterface() {
+            const select = document.getElementById('invoiceSelect');
+            select.innerHTML = '<option value="">Select an invoice...</option>';
+            
+            const invoices = {};
+            allData.forEach(item => {
+                if (!invoices[item.invoice_number]) {
+                    invoices[item.invoice_number] = {
+                        date: item.invoice_date,
+                        supplier: item.supplier,
+                        total: item.invoice_total,
+                        itemCount: 0
+                    };
+                }
+                invoices[item.invoice_number].itemCount++;
+            });
+            
+            Object.keys(invoices).forEach(num => {
+                const inv = invoices[num];
+                const option = document.createElement('option');
+                option.value = num;
+                const total = parseFloat(inv.total || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+                option.textContent = `Invoice ${num} (${inv.itemCount} items) - ${inv.date} - ${inv.supplier} - $${total}`;
+                select.appendChild(option);
+            });
+            
+            document.getElementById('controls').style.display = 'block';
+            
+            select.addEventListener('change', function() {
+                currentInvoice = this.value;
+                if (currentInvoice) {
+                    loadInvoiceData();
+                } else {
+                    hideDataView();
+                }
+            });
+        }
+        
+        function loadInvoiceData() {
+            const items = allData.filter(d => d.invoice_number === currentInvoice);
+            if (items.length === 0) return;
+            
+            const inv = items[0];
+            document.getElementById('statInvoice').textContent = currentInvoice;
+            document.getElementById('statDate').value = inv.invoice_date || '';
+            document.getElementById('statSupplier').value = inv.supplier || '';
+            document.getElementById('statItems').textContent = items.length;
+            
+            const total = parseFloat(inv.invoice_total || 0);
+            document.getElementById('statTotal').value = total;
+            
+            document.getElementById('stats').style.display = 'grid';
+            document.getElementById('tableContainer').style.display = 'block';
+            
+            renderTable(items);
+            updateValidation();
+        }
+        
+        function hideDataView() {
+            document.getElementById('stats').style.display = 'none';
+            document.getElementById('tableContainer').style.display = 'none';
+        }
+        
+        function updateInvoiceField(field, value) {
+            const items = allData.filter(d => d.invoice_number === currentInvoice);
+            items.forEach(item => {
+                item[field] = value;
+            });
+            showAlert('Field updated for all line items in this invoice', 'success');
+        }
+        
+        function updateInvoiceTotal(value) {
+            const items = allData.filter(d => d.invoice_number === currentInvoice);
+            items.forEach(item => {
+                item.invoice_total = value;
+            });
+            updateValidation();
+            showAlert('Invoice total updated', 'success');
+        }
+        
+        function renderTable(items) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            items.forEach((item, idx) => {
+                const globalIndex = allData.indexOf(item);
+                const tr = document.createElement('tr');
+                
+                const qty = parseFloat(item.quantity) || 0;
+                const price = parseFloat(item.unit_price) || 0;
+                const calc = (qty * price).toFixed(2);
+                const total = parseFloat(item.line_total || 0).toFixed(2);
+                const isError = Math.abs(calc - total) > 0.02;
+                
+                tr.innerHTML = `
+                    <td style="width: 60px;"><input type="text" value="${item.position || ''}" onchange="update(${globalIndex}, 'position', this.value)"></td>
+                    <td style="width: 150px;"><input type="text" value="${item.part_number || ''}" onchange="update(${globalIndex}, 'part_number', this.value)"></td>
+                    <td style="width: 100px;"><input type="number" step="any" value="${item.quantity || ''}" onchange="update(${globalIndex}, 'quantity', this.value)"></td>
+                    <td style="width: 80px;"><input type="text" value="${item.unit || ''}" onchange="update(${globalIndex}, 'unit', this.value)"></td>
+                    <td style="width: 120px;"><input type="number" step="any" value="${item.unit_price || ''}" onchange="update(${globalIndex}, 'unit_price', this.value)"></td>
+                    <td style="width: 120px;" class="${isError ? 'error-cell' : ''}"><input type="number" step="any" value="${item.line_total || ''}" onchange="update(${globalIndex}, 'line_total', this.value)"></td>
+                    <td style="width: 120px;" class="readonly">$${calc}</td>
+                    <td style="width: 120px;"><input type="number" step="any" value="${item.net_weight || ''}" onchange="update(${globalIndex}, 'net_weight', this.value)"></td>
+                    <td style="width: 100px;"><input type="text" value="${item.country_of_origin || ''}" onchange="update(${globalIndex}, 'country_of_origin', this.value)" maxlength="3"></td>
+                    <td style="width: 140px;" class="actions">
+                        <button class="btn-info" onclick="insertBelow(${globalIndex})">Insert</button>
+                        <button class="btn-danger" onclick="deleteRow(${globalIndex})">Delete</button>
+                    </td>
+                `;
+                
+                tbody.appendChild(tr);
+            });
+        }
+        
+        function update(index, field, value) {
+            if (allData[index]) {
+                allData[index][field] = value;
+                loadInvoiceData();
+            }
+        }
+        
+        function insertBelow(index) {
+            const item = allData[index];
+            const newItem = {
+                invoice_number: item.invoice_number,
+                invoice_date: item.invoice_date,
+                invoice_total: item.invoice_total,
+                supplier: item.supplier,
+                position: '',
+                part_number: '',
+                quantity: '0',
+                unit: item.unit,
+                unit_price: '0',
+                line_total: '0',
+                net_weight: '',
+                country_of_origin: item.country_of_origin
+            };
+            allData.splice(index + 1, 0, newItem);
+            loadInvoiceData();
+            showAlert('Row inserted', 'success');
+        }
+        
+        function deleteRow(index) {
+            if (!confirm('Delete this line item?')) return;
+            allData.splice(index, 1);
+            loadInvoiceData();
+            showAlert('Row deleted', 'success');
+        }
+        
+        function updateValidation() {
+            const items = allData.filter(d => d.invoice_number === currentInvoice);
+            if (items.length === 0) return;
+            
+            const invTotal = parseFloat(items[0].invoice_total || 0);
+            const sum = items.reduce((s, item) => s + (parseFloat(item.line_total) || 0), 0);
+            const diff = Math.abs(invTotal - sum);
+            
+            document.getElementById('statSum').textContent = '$' + sum.toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('statDiff').textContent = '$' + diff.toLocaleString('en-US', {minimumFractionDigits: 2});
+            
+            const diffEl = document.getElementById('statDiff');
+            if (diff < 0.02) {
+                diffEl.classList.remove('error');
+                diffEl.classList.add('success');
+            } else {
+                diffEl.classList.remove('success');
+                diffEl.classList.add('error');
+            }
+        }
+        
+        function exportToExcel() {
+            if (allData.length === 0) {
+                showAlert('No data to export', 'error');
+                return;
+            }
+            
+            const wb = XLSX.utils.book_new();
+            const headers = [
+                'InvoiceNumber', 'InvoiceDate', 'InvoiceTotal', 'SupplierMID', 'SupplierName',
+                'BuyerPartNumber', 'SupplierPartNumber', 'Quantity', 'UnitOfMeasure', 'Description',
+                'UnitPrice', 'ItemTotal', 'CurrencyCode', 'ExchangeRate', 'CountryOfOrigin',
+                'CountryOfExport', 'DateOfExport', 'PortOfLading', 'RelatedParty', 'PO_Number',
+                'PO_Date', 'GrossWeight', 'GrossWeightUnit', 'NetWeight', 'TariffNumber',
+                'TariffDescription', 'Quantity1', 'UnitOfMeasure1', 'Quantity2', 'UnitOfMeasure2',
+                'Quantity3', 'UnitOfMeasure3', 'PrimarySPI', 'SecondarySPI', 'DeliverTo',
+                'SoldTo', 'SecondaryTariffNumber'
+            ];
+            
+            const rows = [headers];
+            
+            allData.forEach(item => {
+                const row = new Array(37).fill('');
+                row[0] = item.invoice_number;
+                row[1] = item.invoice_date;
+                row[2] = parseFloat(item.invoice_total) || '';
+                row[3] = '';
+                row[4] = item.supplier;
+                row[5] = '';
+                row[6] = item.part_number;
+                row[7] = parseFloat(item.quantity) || '';
+                row[8] = item.unit;
+                row[9] = '';
+                row[10] = parseFloat(item.unit_price) || '';
+                row[11] = parseFloat(item.line_total) || '';
+                row[12] = 'USD';
+                row[13] = '';
+                row[14] = item.country_of_origin;
+                row[23] = parseFloat(item.net_weight) || '';
+                rows.push(row);
+            });
+            
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            XLSX.utils.book_append_sheet(wb, ws, 'Invoice Data');
+            
+            const date = new Date().toISOString().slice(0, 10);
+            const filename = `all_invoices_${date}.xlsx`;
+            XLSX.writeFile(wb, filename);
+            
+            showAlert(`✅ Exported all ${allData.length} line items from ${new Set(allData.map(d => d.invoice_number)).size} invoices!`, 'success');
+        }
+        
+        function resetUpload() {
+            allData = [];
+            currentInvoice = '';
+            document.getElementById('controls').style.display = 'none';
+            hideDataView();
+            document.getElementById('uploadSection').style.display = 'block';
+            document.getElementById('fileInput').value = '';
+        }
+        
+        function showAlert(msg, type) {
+            const alert = document.getElementById('alert');
+            alert.textContent = msg;
+            alert.className = `alert ${type}`;
+            alert.style.display = 'block';
+            setTimeout(() => alert.style.display = 'none', 5000);
+        }
+    </script>
 </body>
 </html>
