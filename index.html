@@ -1,783 +1,427 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Invoice PDF Parser & Editor</title>
-    <!-- pdf.js core -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <!-- xlsx -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #f5f7fa; padding: 20px; }
-        .container { max-width: 1800px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; }
-        .header h1 { margin-bottom: 8px; }
-        .upload-section { padding: 40px; text-align: center; }
-        .upload-box { border: 3px dashed #cbd5e0; border-radius: 8px; padding: 40px; cursor: pointer; transition: all 0.3s; }
-        .upload-box:hover { border-color: #667eea; background: #f7fafc; }
-        .upload-box.dragover { border-color: #667eea; background: #e6f0ff; }
-        #fileInput { display: none; }
-        .loading { padding: 40px; text-align: center; display: none; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .controls { padding: 20px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; display: none; }
-        .controls select { padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; min-width: 400px; margin-right: 10px; }
-        .controls button { padding: 10px 20px; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; margin-right: 10px; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-success:hover { background: #218838; }
-        .btn-primary { background: #007bff; color: white; }
-        .btn-primary:hover { background: #0056b3; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-danger:hover { background: #c82333; }
-        .btn-info { background: #17a2b8; color: white; }
-        .btn-info:hover { background: #138496; }
-        .stats { padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; background: #fff3cd; display: none; }
-        .stat { padding: 15px; background: white; border-radius: 4px; border-left: 4px solid #ffc107; }
-        .stat-label { font-size: 11px; color: #6c757d; text-transform: uppercase; margin-bottom: 5px; }
-        .stat-value { font-size: 20px; font-weight: bold; }
-        .stat-value.error { color: #dc3545; }
-        .stat-value.success { color: #28a745; }
-        .stat input { width: 100%; padding: 6px; border: 1px solid #ced4da; border-radius: 3px; font-size: 16px; font-weight: bold; }
-        .stat.editable { border-left-color: #007bff; }
-        .table-container { padding: 20px; display: none; }
-        .table-header-wrapper { background: #343a40; overflow: hidden; }
-        .table-header { min-width: 1400px; }
-        .table-header table { width: 100%; border-collapse: collapse; }
-        .table-header th { background: #343a40; color: white; padding: 12px 8px; text-align: left; font-weight: 600; font-size: 13px; border: none; }
-        .table-body-wrapper { max-height: 500px; overflow: auto; }
-        .table-body { min-width: 1400px; }
-        .table-body table { width: 100%; border-collapse: collapse; }
-        .table-body td { padding: 10px 8px; border-bottom: 1px solid #dee2e6; background: white; }
-        .table-body tr:hover td { background: #f8f9fa; }
-        .table-body td input { width: 100%; padding: 6px; border: 1px solid #ced4da; border-radius: 3px; font-size: 13px; }
-        .table-body td input:focus { outline: none; border-color: #667eea; }
-        .error-cell { background: #f8d7da !important; }
-        .error-cell input { border-color: #dc3545; }
-        .readonly { background: #e9ecef !important; }
-        .actions { text-align: center; }
-        .actions button { padding: 4px 8px; font-size: 12px; margin: 0 2px; }
-        .alert { padding: 15px; margin: 20px; border-radius: 4px; display: none; }
-        .alert.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .alert.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .inline-help { font-size: 12px; color: #6c757d; margin-left: 8px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice PDF Parser & Editor — Fixed BTL/TIN/BUC</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Arial, sans-serif;background:#f5f7fa;padding:20px}
+    .container{max-width:1800px;margin:0 auto;background:#fff;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+    .header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:30px;border-radius:8px 8px 0 0}
+    .header h1{margin-bottom:8px}
+    .upload-section{padding:40px;text-align:center}
+    .upload-box{border:3px dashed #cbd5e0;border-radius:8px;padding:40px;cursor:pointer;transition:.3s}
+    .upload-box:hover{border-color:#667eea;background:#f7fafc}
+    .upload-box.dragover{border-color:#667eea;background:#e6f0ff}
+    #fileInput{display:none}
+    .loading{padding:40px;text-align:center;display:none}
+    .spinner{border:4px solid #f3f3f3;border-top:4px solid #667eea;border-radius:50%;width:50px;height:50px;animation:spin 1s linear infinite;margin:0 auto 20px}
+    @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+    .controls{padding:20px;background:#f8f9fa;border-bottom:1px solid #dee2e6;display:none}
+    .controls select{padding:10px;border:1px solid #ced4da;border-radius:4px;font-size:14px;min-width:400px;margin-right:10px}
+    .controls button{padding:10px 20px;border:none;border-radius:4px;font-weight:600;cursor:pointer;margin-right:10px}
+    .btn-success{background:#28a745;color:#fff}.btn-success:hover{background:#218838}
+    .btn-primary{background:#007bff;color:#fff}.btn-primary:hover{background:#0056b3}
+    .btn-danger{background:#dc3545;color:#fff}.btn-danger:hover{background:#c82333}
+    .btn-info{background:#17a2b8;color:#fff}.btn-info:hover{background:#138496}
+    .stats{padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px;background:#fff3cd;display:none}
+    .stat{padding:15px;background:#fff;border-radius:4px;border-left:4px solid #ffc107}
+    .stat-label{font-size:11px;color:#6c757d;text-transform:uppercase;margin-bottom:5px}
+    .stat-value{font-size:20px;font-weight:700}
+    .stat-value.error{color:#dc3545}.stat-value.success{color:#28a745}
+    .stat input{width:100%;padding:6px;border:1px solid #ced4da;border-radius:3px;font-size:16px;font-weight:bold}
+    .stat.editable{border-left-color:#007bff}
+    .table-container{padding:20px;display:none}
+    .table-header-wrapper{background:#343a40;overflow:hidden}
+    .table-header{min-width:1400px}
+    .table-header table{width:100%;border-collapse:collapse}
+    .table-header th{background:#343a40;color:#fff;padding:12px 8px;text-align:left;font-weight:600;font-size:13px;border:none}
+    .table-body-wrapper{max-height:500px;overflow:auto}
+    .table-body{min-width:1400px}
+    .table-body table{width:100%;border-collapse:collapse}
+    .table-body td{padding:10px 8px;border-bottom:1px solid #dee2e6;background:#fff}
+    .table-body tr:hover td{background:#f8f9fa}
+    .table-body td input{width:100%;padding:6px;border:1px solid #ced4da;border-radius:3px;font-size:13px}
+    .table-body td input:focus{outline:none;border-color:#667eea}
+    .error-cell{background:#f8d7da!important}.error-cell input{border-color:#dc3545}
+    .readonly{background:#e9ecef!important}
+    .actions{text-align:center}
+    .actions button{padding:4px 8px;font-size:12px;margin:0 2px}
+    .alert{padding:15px;margin:20px;border-radius:4px;display:none}
+    .alert.success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
+    .alert.error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+    .inline-help{font-size:12px;color:#6c757d;margin-left:8px}
+  </style>
 </head>
 <body>
 <div class="container">
-    <div class="header">
-        <h1>📄 Invoice PDF Parser & Editor</h1>
-        <p>Upload PDF, select invoice, edit data, and export to Excel</p>
-    </div>
+  <div class="header">
+    <h1>📄 Invoice PDF Parser & Editor</h1>
+    <p>Upload PDF, select invoice, edit data, and export to Excel</p>
+  </div>
 
-    <div class="upload-section" id="uploadSection">
-        <div class="upload-box" id="uploadBox">
-            <h2>📤 Upload PDF Invoice</h2>
-            <p style="margin-top: 10px; color: #6c757d;">Click or drag & drop your PDF file here</p>
-            <input type="file" id="fileInput" accept=".pdf,application/pdf">
-        </div>
+  <div class="upload-section" id="uploadSection">
+    <div class="upload-box" id="uploadBox">
+      <h2>📤 Upload PDF Invoice</h2>
+      <p style="margin-top:10px;color:#6c757d">Click or drag & drop your PDF file here</p>
+      <input type="file" id="fileInput" accept=".pdf,application/pdf" />
     </div>
+  </div>
 
-    <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <div><strong>Processing PDF...</strong></div>
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div><strong>Processing PDF...</strong></div>
+  </div>
+
+  <div class="alert" id="alert"></div>
+
+  <div class="controls" id="controls">
+    <select id="invoiceSelect"><option value="">Select an invoice...</option></select>
+    <button class="btn-success" onclick="exportToExcel()">📥 Export All to Excel</button>
+    <button class="btn-info" onclick="addBlankRowForCurrent()">➕ Add Blank Row</button>
+    <button class="btn-primary" onclick="resetUpload()">📤 New Upload</button>
+    <span class="inline-help">Tip: Use <strong>Tab</strong>/<strong>Shift+Tab</strong> or <strong>Enter</strong> to move between fields.</span>
+  </div>
+
+  <div class="stats" id="stats">
+    <div class="stat"><div class="stat-label">Invoice Number</div><div class="stat-value" id="statInvoice">-</div></div>
+    <div class="stat editable"><div class="stat-label">Invoice Date (Editable)</div><input autocomplete="off" type="text" id="statDate" placeholder="MM/DD/YYYY" onchange="updateInvoiceField('invoice_date', this.value)"></div>
+    <div class="stat editable"><div class="stat-label">Supplier (Editable)</div><input autocomplete="off" type="text" id="statSupplier" placeholder="Supplier name" onchange="updateInvoiceField('supplier', this.value)"></div>
+    <div class="stat"><div class="stat-label">Total Line Items</div><div class="stat-value" id="statItems">0</div></div>
+    <div class="stat editable"><div class="stat-label">Invoice Total (Editable)</div><input autocomplete="off" type="number" step="0.01" id="statTotal" placeholder="0.00" onchange="updateInvoiceTotal(this.value)"></div>
+    <div class="stat"><div class="stat-label">Line Items Sum</div><div class="stat-value" id="statSum">$0.00</div></div>
+    <div class="stat"><div class="stat-label">Difference</div><div class="stat-value" id="statDiff">$0.00</div></div>
+  </div>
+
+  <div class="table-container" id="tableContainer">
+    <div class="table-header-wrapper">
+      <div class="table-header">
+        <table><thead><tr>
+          <th style="width:60px">Pos</th>
+          <th style="width:150px">Part Number</th>
+          <th style="width:100px">Quantity</th>
+          <th style="width:80px">Unit</th>
+          <th style="width:120px">Unit Price</th>
+          <th style="width:120px">Line Total</th>
+          <th style="width:120px">Calculated</th>
+          <th style="width:120px">Net Weight</th>
+          <th style="width:100px">Country</th>
+          <th style="width:140px">Actions</th>
+        </tr></thead></table>
+      </div>
     </div>
-
-    <div class="alert" id="alert"></div>
-
-    <div class="controls" id="controls">
-        <select id="invoiceSelect">
-            <option value="">Select an invoice...</option>
-        </select>
-        <button class="btn-success" onclick="exportToExcel()">📥 Export All to Excel</button>
-        <button class="btn-info" onclick="addBlankRowForCurrent()">➕ Add Blank Row</button>
-        <button class="btn-primary" onclick="resetUpload()">📤 New Upload</button>
-        <span class="inline-help">Tip: Use <strong>Tab</strong>/<strong>Shift+Tab</strong> or <strong>Enter</strong> to move between fields.</span>
+    <div class="table-body-wrapper">
+      <div class="table-body">
+        <table><tbody id="tableBody"></tbody></table>
+      </div>
     </div>
-
-    <div class="stats" id="stats">
-        <div class="stat">
-            <div class="stat-label">Invoice Number</div>
-            <div class="stat-value" id="statInvoice">-</div>
-        </div>
-        <div class="stat editable">
-            <div class="stat-label">Invoice Date (Editable)</div>
-            <input autocomplete="off" type="text" id="statDate" placeholder="MM/DD/YYYY" onchange="updateInvoiceField('invoice_date', this.value)">
-        </div>
-        <div class="stat editable">
-            <div class="stat-label">Supplier (Editable)</div>
-            <input autocomplete="off" type="text" id="statSupplier" placeholder="Supplier name" onchange="updateInvoiceField('supplier', this.value)">
-        </div>
-        <div class="stat">
-            <div class="stat-label">Total Line Items</div>
-            <div class="stat-value" id="statItems">0</div>
-        </div>
-        <div class="stat editable">
-            <div class="stat-label">Invoice Total (Editable)</div>
-            <input autocomplete="off" type="number" step="0.01" id="statTotal" placeholder="0.00" onchange="updateInvoiceTotal(this.value)">
-        </div>
-        <div class="stat">
-            <div class="stat-label">Line Items Sum</div>
-            <div class="stat-value" id="statSum">$0.00</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">Difference</div>
-            <div class="stat-value" id="statDiff">$0.00</div>
-        </div>
-    </div>
-
-    <div class="table-container" id="tableContainer">
-        <div class="table-header-wrapper">
-            <div class="table-header">
-                <table>
-                    <thead>
-                    <tr>
-                        <th style="width: 60px;">Pos</th>
-                        <th style="width: 150px;">Part Number</th>
-                        <th style="width: 100px;">Quantity</th>
-                        <th style="width: 80px;">Unit</th>
-                        <th style="width: 120px;">Unit Price</th>
-                        <th style="width: 120px;">Line Total</th>
-                        <th style="width: 120px;">Calculated</th>
-                        <th style="width: 120px;">Net Weight</th>
-                        <th style="width: 100px;">Country</th>
-                        <th style="width: 140px;">Actions</th>
-                    </tr>
-                    </thead>
-                </table>
-            </div>
-        </div>
-        <div class="table-body-wrapper">
-            <div class="table-body">
-                <table>
-                    <tbody id="tableBody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
 
 <script>
-    // pdf.js worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    let allData = [];
-    let currentInvoice = '';
-    let invoiceOrder = [];
-    let uploadedPdfName = '';
+  let allData = [];
+  let currentInvoice = '';
+  let invoiceOrder = [];
+  let uploadedPdfName = '';
+  let _nextFocusId = null; // preserves focus across re-renders
 
-    // Used to preserve focus across re-renders when tabbing/entering
-    let _nextFocusId = null;
+  const uploadBox = document.getElementById('uploadBox');
+  const fileInput = document.getElementById('fileInput');
 
-    // Upload interactions
-    const uploadBox = document.getElementById('uploadBox');
-    const fileInput = document.getElementById('fileInput');
+  uploadBox.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) handleFile(f); });
+  uploadBox.addEventListener('dragover', e => { e.preventDefault(); uploadBox.classList.add('dragover'); });
+  uploadBox.addEventListener('dragleave', () => uploadBox.classList.remove('dragover'));
+  uploadBox.addEventListener('drop', e => { e.preventDefault(); uploadBox.classList.remove('dragover'); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handleFile(f); });
 
-    uploadBox.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', e => {
-        const f = e.target.files && e.target.files[0];
-        if (f) handleFile(f);
+  function isPdfFile(file){ const nameOk=(file.name||'').toLowerCase().endsWith('.pdf'); const typeOk=(file.type||'').toLowerCase()==='application/pdf'; return nameOk || typeOk; }
+
+  async function handleFile(file){
+    if(!isPdfFile(file)){ showAlert('Please upload a PDF file','error'); return; }
+    uploadedPdfName = (file.name||'').replace(/\.pdf$/i,'');
+
+    document.getElementById('uploadSection').style.display='none';
+    document.getElementById('loading').style.display='block';
+
+    try{
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      const pdf = await pdfjsLib.getDocument({data:uint8}).promise;
+
+      let fullText='';
+      for(let i=1;i<=pdf.numPages;i++){
+        try{
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent({includeMarkedContent:true});
+          const items = (textContent && Array.isArray(textContent.items))? textContent.items:[];
+          const pageText = items.map(it=> (it && typeof it.str==='string') ? it.str : '').join(' ');
+          fullText += (pageText||'') + '\n';
+        }catch(perPageErr){ console.warn('Failed to read page',i,perPageErr); }
+      }
+
+      if(!fullText.trim()){
+        showAlert('⚠️ The PDF had no extractable text (it may be scanned). Try an OCR’d copy.','error');
+        document.getElementById('uploadSection').style.display='block';
+        return;
+      }
+
+      parseInvoices(fullText);
+
+      if(allData.length>0){
+        const invoiceCount = new Set(allData.map(d=>d.invoice_number)).size;
+        showAlert(`✅ Found ${invoiceCount} invoice(s) with ${allData.length} line items`,'success');
+        setupInterface();
+      }else{
+        showAlert('⚠️ No invoice data found in PDF.','error');
+        document.getElementById('uploadSection').style.display='block';
+      }
+    }catch(err){
+      console.error('PDF processing error:',err); showAlert('Error: '+(err.message||String(err)),'error');
+      document.getElementById('uploadSection').style.display='block';
+    }finally{
+      document.getElementById('loading').style.display='none';
+    }
+  }
+
+  function parseInvoices(text){
+    allData=[]; invoiceOrder=[]; text = String(text||'');
+
+    const splits = text.split(/Customs\s+Invoice\s+(\d+)\s+from/gi);
+    const invoiceGroups = {};
+
+    for(let i=1;i<splits.length;i+=2){
+      const invoiceNum = splits[i]; const sectionText = splits[i+1];
+      if(!invoiceNum || !sectionText) continue;
+      if(!invoiceGroups[invoiceNum]){ invoiceOrder.push(invoiceNum); invoiceGroups[invoiceNum]=''; }
+      invoiceGroups[invoiceNum] += sectionText + '\n';
+    }
+
+    Object.keys(invoiceGroups).forEach(invoiceNum => {
+      const sectionText = invoiceGroups[invoiceNum] || '';
+
+      const dateMatch = sectionText.match(/^\s*(\d{2}\/\d{2}\/\d{4})/);
+      const invoiceDate = dateMatch ? dateMatch[1] : '';
+
+      const firstPart = sectionText.substring(0,800);
+      let supplier='';
+      const supplierPattern=/(Rüdt Industrielacke GmbH & Co\. KG|Norix Lackf?abrik GmbH & Co\. KG|Finalin GmbH & Co\. KG)/i;
+      const supplierMatch = firstPart.match(supplierPattern);
+      if(supplierMatch){ supplier = supplierMatch[1].trim(); if(/Lackf/i.test(supplier)) supplier='Norix Lackfabrik GmbH & Co. KG'; }
+      else {
+        if(firstPart.includes('Rüdt')||firstPart.includes('Rudt')) supplier='Rüdt Industrielacke GmbH & Co. KG';
+        else if(firstPart.includes('Norix')||firstPart.includes('Lackf')) supplier='Norix Lackfabrik GmbH & Co. KG';
+        else if(firstPart.includes('Finalin')) supplier='Finalin GmbH & Co. KG';
+      }
+
+      let invoiceTotal='';
+      const overallPattern=/Overall\s+amount\s+in\s+USD\s+([\d,]+\.?\d*)/gi;
+      const overallMatches=[...sectionText.matchAll(overallPattern)];
+      if(overallMatches.length) invoiceTotal = overallMatches.at(-1)[1].replace(/,/g,'');
+      if(!invoiceTotal){
+        const totalNetPattern=/Total\s+net\s+amount\s+([\d,]+\.?\d*)/gi;
+        const totalNetMatches=[...sectionText.matchAll(totalNetPattern)];
+        if(totalNetMatches.length) invoiceTotal = totalNetMatches.at(-1)[1].replace(/,/g,'');
+      }
+      if(!invoiceTotal){
+        const vatPattern=/VAT\s*\(\s*USD\s*\)\s+([\d,]+\.?\d*)\s+[\d.]+\s*%/gi;
+        const vatMatches=[...sectionText.matchAll(vatPattern)];
+        if(vatMatches.length) invoiceTotal = vatMatches.at(-1)[1].replace(/,/g,'');
+      }
+      if(!invoiceTotal){
+        const endSection=sectionText.slice(-1000);
+        const splitPattern=/Overall[^0-9]+([\d,]+\.?\d*)/gi;
+        const splitMatches=[...endSection.matchAll(splitPattern)];
+        if(splitMatches.length) invoiceTotal = splitMatches.at(-1)[1].replace(/,/g,'');
+      }
+
+      // ==== LINE PARSING ====
+      const UNIT_WORD = '(?:carton|bucket(?:s|\\(s\\))?|pail|tin|can|barrel|canister|cartridge|bottle(?:s|\\(s\\))?|piece(?:\\(s\\))?|can(?:\\(s\\))?|pail(?:\\(s\\))?|tin(?:\\(s\\))?|Kilogramme)';
+
+      // With "x ..." form
+      const linePatternA = new RegExp(
+        String.raw`(\d+)\s+([A-Z0-9.\-]+)\s+([\d,]+\.?\d*)\s+${UNIT_WORD}\s*(?:\([^)]*\)\s*)?` +
+        String.raw`x\s*([\d,]+\.?\d+)\s+([A-Z]+)\s+` +
+        String.raw`([\d,]+\.?\d+)\s+([A-Z]+)\s+` +
+        String.raw`([\d.,]+)\s+USD\/(FOZ|KG|GAL|QT|PT|CN|PC|L|CAT|TIN|BTL|BUC)\s+` +
+        String.raw`([\d,]+\.?\d+)`,
+        'gi'
+      );
+
+      // No "x ..."
+      const linePatternB = new RegExp(
+        String.raw`(\d+)\s+([A-Z0-9.\-]+)\s+([\d,]+\.?\d*)\s+${UNIT_WORD}\s*` +
+        String.raw`([\d,]+\.?\d+)\s+([A-Z]+)\s+` +
+        String.raw`([\d.,]+)\s+USD\/(FOZ|KG|GAL|QT|PT|CN|PC|L|CAT|TIN|BTL|BUC)\s+` +
+        String.raw`([\d,]+\.?\d+)`,
+        'gi'
+      );
+
+      const positionsFound = new Set();
+      const lineItems = [];
+
+      function pushItem(c){
+        const {position,partNumber,containerQty,perUnitQty,perUnitType,totalQty,totalUnit,unitPrice,priceUnit,lineTotal,matchIndex}=c;
+        let quantity, unit;
+        if(['CN','PC','CAT','TIN','BTL','BUC'].includes(priceUnit)){
+          quantity = containerQty || totalQty; unit = priceUnit;
+        }else if(['KG','GAL','PT','QT','FOZ','L'].includes(priceUnit)){
+          quantity = totalQty; unit = priceUnit;
+        }else if(priceUnit === totalUnit){
+          quantity = totalQty; unit = priceUnit;
+        }else{ quantity = totalQty; unit = priceUnit; }
+
+        lineItems.push({
+          invoice_number:invoiceNum,
+          invoice_date:invoiceDate,
+          invoice_total:invoiceTotal,
+          supplier:supplier,
+          position,
+          part_number:partNumber,
+          quantity, unit,
+          unit_price:unitPrice,
+          line_total:lineTotal,
+          net_weight:'', country_of_origin:'',
+          matchIndex
+        });
+      }
+
+      let mA; while((mA=linePatternA.exec(sectionText))!==null){
+        const position=mA[1]; if(positionsFound.has(position)) continue; positionsFound.add(position);
+        pushItem({
+          position,
+          partNumber:(mA[2]||'').slice(0,32),
+          containerQty:(mA[3]||'').replace(/,/g,''),
+          perUnitQty:(mA[4]||'').replace(/,/g,''),
+          perUnitType:mA[5]||'',
+          totalQty:(mA[6]||'').replace(/,/g,''),
+          totalUnit:mA[7]||'',
+          unitPrice:mA[8]||'',
+          priceUnit:mA[9]||'',
+          lineTotal:(mA[10]||'').replace(/,/g,''),
+          matchIndex:mA.index ?? 0
+        });
+      }
+
+      let mB; while((mB=linePatternB.exec(sectionText))!==null){
+        const position=mB[1]; if(positionsFound.has(position)) continue; positionsFound.add(position);
+        pushItem({
+          position,
+          partNumber:(mB[2]||'').slice(0,32),
+          containerQty:(mB[3]||'').replace(/,/g,''),
+          perUnitQty:'', perUnitType:'',
+          totalQty:(mB[4]||'').replace(/,/g,''),
+          totalUnit:mB[5]||'',
+          unitPrice:(mB[6]||''),
+          priceUnit:mB[7]||'',
+          lineTotal:(mB[8]||'').replace(/,/g,''),
+          matchIndex:mB.index ?? 0
+        });
+      }
+
+      // enrichers
+      lineItems.forEach((item, idx)=>{
+        const startPos=item.matchIndex ?? 0;
+        const endPos = idx < lineItems.length-1 ? (lineItems[idx+1].matchIndex ?? (startPos+2000)) : (startPos+3000);
+        const itemSection = sectionText.substring(startPos, Math.min(endPos, sectionText.length));
+
+        const weightMatch=itemSection.match(/([\d,]+\.?\d+)\s+L\s+([\d,]+\.?\d+)\s+L/);
+        if(weightMatch){ item.net_weight=(weightMatch[2]||'').replace(/,/g,''); }
+
+        const cooMatch=itemSection.match(/Country\s+of\s+origin:\s*(?:Federal\s+Republic\s+of\s+)?(\w+)/i);
+        if(cooMatch){ let country=cooMatch[1]||''; const lc=country.toLowerCase();
+          if(lc==='germany') country='DE'; else if(lc==='japan') country='JP'; else if(lc==='netherlands') country='NL'; else if(lc==='united'||lc==='kingdom') country='GB';
+          item.country_of_origin=country; }
+        delete item.matchIndex;
+      });
+
+      if(lineItems.length===0){
+        lineItems.push({invoice_number:invoiceNum,invoice_date:invoiceDate,invoice_total:invoiceTotal,supplier:supplier,position:'',part_number:'',quantity:'',unit:'',unit_price:'',line_total:'',net_weight:'',country_of_origin:''});
+      }
+
+      allData.push(...lineItems);
     });
+  }
 
-    uploadBox.addEventListener('dragover', e => {
-        e.preventDefault();
-        uploadBox.classList.add('dragover');
+  function setupInterface(){
+    const select=document.getElementById('invoiceSelect');
+    select.innerHTML='<option value="">Select an invoice...</option>';
+    const invoices={};
+    allData.forEach(item=>{ if(!invoices[item.invoice_number]){ invoices[item.invoice_number]={date:item.invoice_date,supplier:item.supplier,total:item.invoice_total,itemCount:0}; } invoices[item.invoice_number].itemCount++; });
+    invoiceOrder.forEach(num=>{ const inv = invoices[num] || {date:'',supplier:'',total:0,itemCount:0}; const total=parseFloat(inv.total||0).toLocaleString('en-US',{minimumFractionDigits:2}); const opt=document.createElement('option'); opt.value=num; opt.textContent=`Invoice ${num} (${inv.itemCount} items) - ${inv.date} - ${inv.supplier} - $${total}`; select.appendChild(opt); });
+    document.getElementById('controls').style.display='block';
+    select.addEventListener('change', function(){ currentInvoice=this.value; if(currentInvoice) loadInvoiceData(); else hideDataView(); });
+  }
+
+  function loadInvoiceData(){
+    let items = allData.filter(d=>d.invoice_number===currentInvoice);
+    if(items.length===0){ const meta={invoice_number:currentInvoice,invoice_date:'',invoice_total:'',supplier:''}; allData.push({...meta,position:'',part_number:'',quantity:'',unit:'',unit_price:'',line_total:'',net_weight:'',country_of_origin:''}); items = allData.filter(d=>d.invoice_number===currentInvoice); }
+
+    const inv=items[0];
+    document.getElementById('statInvoice').textContent=currentInvoice;
+    document.getElementById('statDate').value=inv.invoice_date||'';
+    document.getElementById('statSupplier').value=inv.supplier||'';
+    document.getElementById('statItems').textContent=items.length;
+    const total=parseFloat(inv.invoice_total||0); document.getElementById('statTotal').value=Number.isFinite(total)? total : '';
+
+    document.getElementById('stats').style.display='grid';
+    document.getElementById('tableContainer').style.display='block';
+    renderTable(items); updateValidation();
+    if(!_nextFocusId){ setTimeout(()=>{ const first=document.querySelector('#tableBody input'); if(first) first.focus(); },0); }
+  }
+
+  function hideDataView(){ document.getElementById('stats').style.display='none'; document.getElementById('tableContainer').style.display='none'; }
+  function updateInvoiceField(field,value){ const items=allData.filter(d=>d.invoice_number===currentInvoice); items.forEach(it=>{it[field]=value}); showAlert('Field updated for all line items in this invoice','success'); }
+  function updateInvoiceTotal(value){ const v=parseFloat(value); const items=allData.filter(d=>d.invoice_number===currentInvoice); items.forEach(it=>{it.invoice_total=Number.isFinite(v)? v : ''}); updateValidation(); showAlert('Invoice total updated','success'); }
+
+  function renderTable(items){
+    const tbody=document.getElementById('tableBody'); tbody.innerHTML='';
+    let fid=1;
+    items.forEach(item=>{
+      const globalIndex=allData.indexOf(item);
+      const qty=parseFloat(item.quantity)||0; const price=parseFloat(item.unit_price)||0; const calc=(qty*price).toFixed(2); const total=parseFloat(item.line_total||0).toFixed(2); const isError=Math.abs(calc-total)>0.02;
+      const fids={position:fid++,part_number:fid++,quantity:fid++,unit:fid++,unit_price:fid++,line_total:fid++,net_weight:fid++,country_of_origin:fid++};
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td style="width:60px"><input autocomplete="off" id="cell-${fids.position}" data-fid="${fids.position}" tabindex="${fids.position}" type="text" value="${item.position||''}" onkeydown="keyNav(event, ${globalIndex}, 'position', ${fids.position})" onchange="update(${globalIndex}, 'position', this.value)"></td>
+        <td style="width:150px"><input autocomplete="off" id="cell-${fids.part_number}" data-fid="${fids.part_number}" tabindex="${fids.part_number}" type="text" value="${item.part_number||''}" onkeydown="keyNav(event, ${globalIndex}, 'part_number', ${fids.part_number})" onchange="update(${globalIndex}, 'part_number', this.value)"></td>
+        <td style="width:100px"><input autocomplete="off" id="cell-${fids.quantity}" data-fid="${fids.quantity}" tabindex="${fids.quantity}" type="number" step="any" value="${item.quantity||''}" onkeydown="keyNav(event, ${globalIndex}, 'quantity', ${fids.quantity})" onchange="update(${globalIndex}, 'quantity', this.value)"></td>
+        <td style="width:80px"><input autocomplete="off" id="cell-${fids.unit}" data-fid="${fids.unit}" tabindex="${fids.unit}" type="text" value="${item.unit||''}" onkeydown="keyNav(event, ${globalIndex}, 'unit', ${fids.unit})" onchange="update(${globalIndex}, 'unit', this.value)"></td>
+        <td style="width:120px"><input autocomplete="off" id="cell-${fids.unit_price}" data-fid="${fids.unit_price}" tabindex="${fids.unit_price}" type="number" step="any" value="${item.unit_price||''}" onkeydown="keyNav(event, ${globalIndex}, 'unit_price', ${fids.unit_price})" onchange="update(${globalIndex}, 'unit_price', this.value)"></td>
+        <td style="width:120px" class="${isError?'error-cell':''}"><input autocomplete="off" id="cell-${fids.line_total}" data-fid="${fids.line_total}" tabindex="${fids.line_total}" type="number" step="any" value="${item.line_total||''}" onkeydown="keyNav(event, ${globalIndex}, 'line_total', ${fids.line_total})" onchange="update(${globalIndex}, 'line_total', this.value)"></td>
+        <td style="width:120px" class="readonly">$${calc}</td>
+        <td style="width:120px"><input autocomplete="off" id="cell-${fids.net_weight}" data-fid="${fids.net_weight}" tabindex="${fids.net_weight}" type="number" step="any" value="${item.net_weight||''}" onkeydown="keyNav(event, ${globalIndex}, 'net_weight', ${fids.net_weight})" onchange="update(${globalIndex}, 'net_weight', this.value)"></td>
+        <td style="width:100px"><input autocomplete="off" id="cell-${fids.country_of_origin}" data-fid="${fids.country_of_origin}" tabindex="${fids.country_of_origin}" type="text" value="${item.country_of_origin||''}" onkeydown="keyNav(event, ${globalIndex}, 'country_of_origin', ${fids.country_of_origin})" onchange="update(${globalIndex}, 'country_of_origin', this.value)" maxlength="3"></td>
+        <td style="width:140px" class="actions"><button class="btn-info" onclick="insertBelow(${globalIndex})">Insert</button> <button class="btn-danger" onclick="deleteRow(${globalIndex})">Delete</button></td>`;
+      tbody.appendChild(tr);
     });
-    uploadBox.addEventListener('dragleave', () => uploadBox.classList.remove('dragover'));
-    uploadBox.addEventListener('drop', e => {
-        e.preventDefault();
-        uploadBox.classList.remove('dragover');
-        const f = e.dataTransfer.files && e.dataTransfer.files[0];
-        if (f) handleFile(f);
-    });
-
-    function isPdfFile(file) {
-        const nameOk = (file.name || '').toLowerCase().endsWith('.pdf');
-        const typeOk = (file.type || '').toLowerCase() === 'application/pdf';
-        return nameOk || typeOk;
-    }
-
-    async function handleFile(file) {
-        if (!isPdfFile(file)) {
-            showAlert('Please upload a PDF file', 'error');
-            return;
-        }
-
-        // remember uploaded PDF name for export naming
-        uploadedPdfName = (file.name || '').replace(/\.pdf$/i, '');
-
-        document.getElementById('uploadSection').style.display = 'none';
-        document.getElementById('loading').style.display = 'block';
-
-        try {
-            const arrayBuffer = await file.arrayBuffer();
-            const uint8 = new Uint8Array(arrayBuffer);
-
-            const loadingTask = pdfjsLib.getDocument({ data: uint8 });
-            const pdf = await loadingTask.promise;
-
-            let fullText = '';
-            for (let i = 1; i <= pdf.numPages; i++) {
-                try {
-                    const page = await pdf.getPage(i);
-                    const textContent = await page.getTextContent({ includeMarkedContent: true });
-                    const items = (textContent && Array.isArray(textContent.items)) ? textContent.items : [];
-                    const pageText = items.map(it => (it && typeof it.str === 'string') ? it.str : '').join(' ');
-                    fullText += (pageText || '') + '\n';
-                } catch (perPageErr) {
-                    console.warn(`Failed to read page ${i}:`, perPageErr);
-                }
-            }
-
-            if (!fullText || !fullText.trim()) {
-                showAlert('⚠️ The PDF had no extractable text (it may be scanned). Try an OCR’d copy.', 'error');
-                document.getElementById('uploadSection').style.display = 'block';
-                return;
-            }
-
-            parseInvoices(fullText);
-
-            if (allData.length > 0) {
-                const invoiceCount = new Set(allData.map(d => d.invoice_number)).size;
-                showAlert(`✅ Found ${invoiceCount} invoice(s) with ${allData.length} line items`, 'success');
-                setupInterface();
-            } else {
-                showAlert('⚠️ No invoice data found in PDF.', 'error');
-                document.getElementById('uploadSection').style.display = 'block';
-            }
-        } catch (error) {
-            console.error('Top-level PDF processing error:', error);
-            const msg = (error && error.message) ? error.message : String(error);
-            showAlert('Error: ' + msg, 'error');
-            document.getElementById('uploadSection').style.display = 'block';
-        } finally {
-            document.getElementById('loading').style.display = 'none';
-        }
-    }
-
-    function parseInvoices(text) {
-        allData = [];
-        invoiceOrder = [];
-
-        text = (typeof text === 'string') ? text : '';
-
-        const splits = text.split(/Customs\s+Invoice\s+(\d+)\s+from/gi);
-        const invoiceGroups = {};
-
-        for (let i = 1; i < splits.length; i += 2) {
-            const invoiceNum = splits[i];
-            const sectionText = splits[i + 1];
-            if (!invoiceNum || !sectionText) continue;
-
-            if (!invoiceGroups[invoiceNum]) {
-                invoiceOrder.push(invoiceNum);
-                invoiceGroups[invoiceNum] = '';
-            }
-            invoiceGroups[invoiceNum] += sectionText + '\n';
-        }
-
-        Object.keys(invoiceGroups).forEach(invoiceNum => {
-            const sectionText = invoiceGroups[invoiceNum] || '';
-
-            // date
-            const dateMatch = sectionText.match(/^\s*(\d{2}\/\d{2}\/\d{4})/);
-            const invoiceDate = dateMatch ? dateMatch[1] : '';
-
-            // supplier
-            const firstPart = sectionText.substring(0, 800);
-            let supplier = '';
-            const supplierPattern = /(Rüdt Industrielacke GmbH & Co\. KG|Norix Lackf?abrik GmbH & Co\. KG|Finalin GmbH & Co\. KG)/i;
-            const supplierMatch = firstPart.match(supplierPattern);
-            if (supplierMatch) {
-                supplier = supplierMatch[1].trim();
-                if (/Lackf/i.test(supplier)) supplier = 'Norix Lackfabrik GmbH & Co. KG';
-            } else {
-                if (firstPart.includes('Rüdt') || firstPart.includes('Rudt')) supplier = 'Rüdt Industrielacke GmbH & Co. KG';
-                else if (firstPart.includes('Norix') || firstPart.includes('Lackf')) supplier = 'Norix Lackfabrik GmbH & Co. KG';
-                else if (firstPart.includes('Finalin')) supplier = 'Finalin GmbH & Co. KG';
-            }
-
-            // invoice total
-            let invoiceTotal = '';
-            const overallPattern = /Overall\s+amount\s+in\s+USD\s+([\d,]+\.?\d*)/gi;
-            const overallMatches = [...sectionText.matchAll(overallPattern)];
-            if (overallMatches.length) {
-                invoiceTotal = overallMatches.at(-1)[1].replace(/,/g, '');
-            }
-            if (!invoiceTotal) {
-                const totalNetPattern = /Total\s+net\s+amount\s+([\d,]+\.?\d*)/gi;
-                const totalNetMatches = [...sectionText.matchAll(totalNetPattern)];
-                if (totalNetMatches.length) invoiceTotal = totalNetMatches.at(-1)[1].replace(/,/g, '');
-            }
-            if (!invoiceTotal) {
-                const vatPattern = /VAT\s*\(\s*USD\s*\)\s+([\d,]+\.?\d*)\s+[\d.]+\s*%/gi;
-                const vatMatches = [...sectionText.matchAll(vatPattern)];
-                if (vatMatches.length) invoiceTotal = vatMatches.at(-1)[1].replace(/,/g, '');
-            }
-            if (!invoiceTotal) {
-                const endSection = sectionText.slice(-1000);
-                const splitPattern = /Overall[^0-9]+([\d,]+\.?\d*)/gi;
-                const splitMatches = [...endSection.matchAll(splitPattern)];
-                if (splitMatches.length) invoiceTotal = splitMatches.at(-1)[1].replace(/,/g, '');
-            }
-
-            // ====== LINE PARSING (two patterns) ======
-            const UNIT_WORD = '(?:carton|bucket(?:s|\(s\))?|pail|tin|can|barrel|canister|cartridge|bottle(?:s|\(s\))?|piece(?:\(s\))?|can(?:\(s\))?|pail(?:\(s\))?|tin(?:\(s\))?|Kilogramme)';
-
-            // Pattern A: lines with "x ..." segment
-            const linePatternA = new RegExp(
-                String.raw`(\d+)\s+([A-Z0-9.\-]+)\s+([\d,]+\.?\d*)\s+${UNIT_WORD}\s*(?:\([^\)]*\)\s*)?` +
-                String.raw`x\s*([\d,]+\.?\d+)\s+([A-Z]+)\s+` +
-                String.raw`([\d,]+\.?\d+)\s+([A-Z]+)\s+` +
-                String.raw`([\d.,]+)\s+USD/(FOZ|KG|GAL|QT|PT|CN|PC|L|CAT|TIN|BTL|BUC)\s+` +
-                String.raw`([\d,]+\.?\d+)`,
-                'gi'
-            );
-
-            // Pattern B: PC/each style WITHOUT "x ..."
-            const linePatternB = new RegExp(
-                String.raw`(\d+)\s+([A-Z0-9.\-]+)\s+([\d,]+\.?\d*)\s+${UNIT_WORD}\s*` +
-                String.raw`([\d,]+\.?\d+)\s+([A-Z]+)\s+` +
-                String.raw`([\d.,]+)\s+USD/(FOZ|KG|GAL|QT|PT|CN|PC|L|CAT|TIN|BTL|BUC)\s+` +
-                String.raw`([\d,]+\.?\d+)`,
-                'gi'
-            );
-
-            const positionsFound = new Set();
-            const lineItems = [];
-
-            function pushItem(c) {
-                const {
-                    position, partNumber, containerQty,
-                    perUnitQty, perUnitType, totalQty, totalUnit,
-                    unitPrice, priceUnit, lineTotal, matchIndex
-                } = c;
-
-                let quantity, unit;
-                if (['CN','PC','CAT','TIN','BTL','BUC'].includes(priceUnit)) {
-                    quantity = containerQty || totalQty;
-                    unit = priceUnit;
-                } else if (['KG','GAL','PT','QT','FOZ','L'].includes(priceUnit)) {
-                    quantity = totalQty;
-                    unit = priceUnit;
-                } else if (priceUnit === totalUnit) {
-                    quantity = totalQty;
-                    unit = priceUnit;
-                } else {
-                    quantity = totalQty;
-                    unit = priceUnit;
-                }
-
-                lineItems.push({
-                    invoice_number: invoiceNum,
-                    invoice_date: invoiceDate,
-                    invoice_total: invoiceTotal,
-                    supplier: supplier,
-                    position,
-                    part_number: partNumber,
-                    quantity,
-                    unit,
-                    unit_price: unitPrice,
-                    line_total: lineTotal,
-                    net_weight: '',
-                    country_of_origin: '',
-                    matchIndex
-                });
-            }
-
-            // Pattern A: with "x ..."
-            let mA;
-            while ((mA = linePatternA.exec(sectionText)) !== null) {
-                const position = mA[1];
-                if (positionsFound.has(position)) continue;
-                positionsFound.add(position);
-
-                pushItem({
-                    position,
-                    partNumber: (mA[2] || '').slice(0, 32),
-                    containerQty: (mA[3] || '').replace(/,/g, ''),
-                    perUnitQty: (mA[4] || '').replace(/,/g, ''),
-                    perUnitType: mA[5] || '',
-                    totalQty: (mA[6] || '').replace(/,/g, ''),
-                    totalUnit: mA[7] || '',
-                    unitPrice: mA[8] || '',
-                    priceUnit: mA[9] || '',
-                    lineTotal: (mA[10] || '').replace(/,/g, ''),
-                    matchIndex: mA.index ?? 0
-                });
-            }
-
-            // Pattern B: no "x ..."
-            let mB;
-            while ((mB = linePatternB.exec(sectionText)) !== null) {
-                const position = mB[1];
-                if (positionsFound.has(position)) continue;
-                positionsFound.add(position);
-
-                pushItem({
-                    position,
-                    partNumber: (mB[2] || '').slice(0, 32),
-                    containerQty: (mB[3] || '').replace(/,/g, ''),
-                    perUnitQty: '',
-                    perUnitType: '',
-                    totalQty: (mB[4] || '').replace(/,/g, ''),
-                    totalUnit: mB[5] || '',
-                    unitPrice: (mB[6] || ''),
-                    priceUnit: mB[7] || '',
-                    lineTotal: (mB[8] || '').replace(/,/g, ''),
-                    matchIndex: mB.index ?? 0
-                });
-            }
-
-            // Post-parse: enrich with per-line weight and COO if present
-            lineItems.forEach((item, idx) => {
-                const startPos = item.matchIndex ?? 0;
-                const endPos = idx < lineItems.length - 1 ? (lineItems[idx + 1].matchIndex ?? (startPos + 2000)) : (startPos + 3000);
-                const itemSection = sectionText.substring(startPos, Math.min(endPos, sectionText.length));
-
-                const weightMatch = itemSection.match(/([\d,]+\.?\d+)\s+L\s+([\d,]+\.?\d+)\s+L/);
-                if (weightMatch) {
-                    item.net_weight = (weightMatch[2] || '').replace(/,/g, '');
-                }
-
-                const cooMatch = itemSection.match(/Country\s+of\s+origin:\s*(?:Federal\s+Republic\s+of\s+)?(\w+)/i);
-                if (cooMatch) {
-                    let country = cooMatch[1] || '';
-                    const lc = country.toLowerCase();
-                    if (lc === 'germany') country = 'DE';
-                    else if (lc === 'japan') country = 'JP';
-                    else if (lc === 'netherlands') country = 'NL';
-                    else if (lc === 'united' || lc === 'kingdom') country = 'GB';
-                    item.country_of_origin = country;
-                }
-
-                delete item.matchIndex;
-            });
-
-            // === NEW: If no lines parsed, create a single blank line so user can enter data manually ===
-            if (lineItems.length === 0) {
-                lineItems.push({
-                    invoice_number: invoiceNum,
-                    invoice_date: invoiceDate,
-                    invoice_total: invoiceTotal,
-                    supplier: supplier,
-                    position: '',
-                    part_number: '',
-                    quantity: '',
-                    unit: '',
-                    unit_price: '',
-                    line_total: '',
-                    net_weight: '',
-                    country_of_origin: ''
-                });
-            }
-
-            allData.push(...lineItems);
-        });
-    }
-
-    function setupInterface() {
-        const select = document.getElementById('invoiceSelect');
-        select.innerHTML = '<option value="">Select an invoice...</option>';
-
-        const invoices = {};
-        allData.forEach(item => {
-            if (!invoices[item.invoice_number]) {
-                invoices[item.invoice_number] = {
-                    date: item.invoice_date,
-                    supplier: item.supplier,
-                    total: item.invoice_total,
-                    itemCount: 0
-                };
-            }
-            invoices[item.invoice_number].itemCount++;
-        });
-
-        invoiceOrder.forEach(num => {
-            const inv = invoices[num] || { date: '', supplier: '', total: 0, itemCount: 0 };
-            const total = parseFloat(inv.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
-            const option = document.createElement('option');
-            option.value = num;
-            option.textContent = `Invoice ${num} (${inv.itemCount} items) - ${inv.date} - ${inv.supplier} - $${total}`;
-            select.appendChild(option);
-        });
-
-        document.getElementById('controls').style.display = 'block';
-
-        select.addEventListener('change', function () {
-            currentInvoice = this.value;
-            if (currentInvoice) loadInvoiceData();
-            else hideDataView();
-        });
-    }
-
-    function loadInvoiceData() {
-        let items = allData.filter(d => d.invoice_number === currentInvoice);
-
-        // Ensure at least one editable row exists for manual entry
-        if (items.length === 0) {
-            const meta = { invoice_number: currentInvoice, invoice_date: '', invoice_total: '', supplier: '' };
-            allData.push({ ...meta, position: '', part_number: '', quantity: '', unit: '', unit_price: '', line_total: '', net_weight: '', country_of_origin: '' });
-            items = allData.filter(d => d.invoice_number === currentInvoice);
-        }
-
-        const inv = items[0];
-        document.getElementById('statInvoice').textContent = currentInvoice;
-        document.getElementById('statDate').value = inv.invoice_date || '';
-        document.getElementById('statSupplier').value = inv.supplier || '';
-        document.getElementById('statItems').textContent = items.length;
-
-        const total = parseFloat(inv.invoice_total || 0);
-        document.getElementById('statTotal').value = Number.isFinite(total) ? total : '';
-
-        document.getElementById('stats').style.display = 'grid';
-        document.getElementById('tableContainer').style.display = 'block';
-
-        renderTable(items);
-        updateValidation();
-
-        // Focus the first input if nothing is queued for focus
-        if (!_nextFocusId) {
-            setTimeout(() => {
-                const first = document.querySelector('#tableBody input');
-                if (first) first.focus();
-            }, 0);
-        }
-    }
-
-    function hideDataView() {
-        document.getElementById('stats').style.display = 'none';
-        document.getElementById('tableContainer').style.display = 'none';
-    }
-
-    function updateInvoiceField(field, value) {
-        const items = allData.filter(d => d.invoice_number === currentInvoice);
-        items.forEach(item => { item[field] = value; });
-        showAlert('Field updated for all line items in this invoice', 'success');
-    }
-
-    function updateInvoiceTotal(value) {
-        const v = parseFloat(value);
-        const items = allData.filter(d => d.invoice_number === currentInvoice);
-        items.forEach(item => { item.invoice_total = Number.isFinite(v) ? v : ''; });
-        updateValidation();
-        showAlert('Invoice total updated', 'success');
-    }
-
-    function renderTable(items) {
-        const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = '';
-
-        // Sequential focus id for tab order across all fields
-        let fid = 1;
-
-        items.forEach(item => {
-            const globalIndex = allData.indexOf(item);
-            const qty = parseFloat(item.quantity) || 0;
-            const price = parseFloat(item.unit_price) || 0;
-            const calc = (qty * price).toFixed(2);
-            const total = parseFloat(item.line_total || 0).toFixed(2);
-            const isError = Math.abs(calc - total) > 0.02;
-
-            const fids = {
-                position: fid++,
-                part_number: fid++,
-                quantity: fid++,
-                unit: fid++,
-                unit_price: fid++,
-                line_total: fid++,
-                net_weight: fid++,
-                country_of_origin: fid++,
-            };
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="width: 60px;"><input autocomplete="off" id="cell-${fids.position}" data-fid="${fids.position}" tabindex="${fids.position}" type="text" value="${item.position || ''}" onkeydown="keyNav(event, ${globalIndex}, 'position', ${fids.position})" onchange="update(${globalIndex}, 'position', this.value)"></td>
-                <td style="width: 150px;"><input autocomplete="off" id="cell-${fids.part_number}" data-fid="${fids.part_number}" tabindex="${fids.part_number}" type="text" value="${item.part_number || ''}" onkeydown="keyNav(event, ${globalIndex}, 'part_number', ${fids.part_number})" onchange="update(${globalIndex}, 'part_number', this.value)"></td>
-                <td style="width: 100px;"><input autocomplete="off" id="cell-${fids.quantity}" data-fid="${fids.quantity}" tabindex="${fids.quantity}" type="number" step="any" value="${item.quantity || ''}" onkeydown="keyNav(event, ${globalIndex}, 'quantity', ${fids.quantity})" onchange="update(${globalIndex}, 'quantity', this.value)"></td>
-                <td style="width: 80px;"><input autocomplete="off" id="cell-${fids.unit}" data-fid="${fids.unit}" tabindex="${fids.unit}" type="text" value="${item.unit || ''}" onkeydown="keyNav(event, ${globalIndex}, 'unit', ${fids.unit})" onchange="update(${globalIndex}, 'unit', this.value)"></td>
-                <td style="width: 120px;"><input autocomplete="off" id="cell-${fids.unit_price}" data-fid="${fids.unit_price}" tabindex="${fids.unit_price}" type="number" step="any" value="${item.unit_price || ''}" onkeydown="keyNav(event, ${globalIndex}, 'unit_price', ${fids.unit_price})" onchange="update(${globalIndex}, 'unit_price', this.value)"></td>
-                <td style="width: 120px;" class="${isError ? 'error-cell' : ''}"><input autocomplete="off" id="cell-${fids.line_total}" data-fid="${fids.line_total}" tabindex="${fids.line_total}" type="number" step="any" value="${item.line_total || ''}" onkeydown="keyNav(event, ${globalIndex}, 'line_total', ${fids.line_total})" onchange="update(${globalIndex}, 'line_total', this.value)"></td>
-                <td style="width: 120px;" class="readonly">$${calc}</td>
-                <td style="width: 120px;"><input autocomplete="off" id="cell-${fids.net_weight}" data-fid="${fids.net_weight}" tabindex="${fids.net_weight}" type="number" step="any" value="${item.net_weight || ''}" onkeydown="keyNav(event, ${globalIndex}, 'net_weight', ${fids.net_weight})" onchange="update(${globalIndex}, 'net_weight', this.value)"></td>
-                <td style="width: 100px;"><input autocomplete="off" id="cell-${fids.country_of_origin}" data-fid="${fids.country_of_origin}" tabindex="${fids.country_of_origin}" type="text" value="${item.country_of_origin || ''}" onkeydown="keyNav(event, ${globalIndex}, 'country_of_origin', ${fids.country_of_origin})" onchange="update(${globalIndex}, 'country_of_origin', this.value)" maxlength="3"></td>
-                <td style="width: 140px;" class="actions">
-                    <button class="btn-info" onclick="insertBelow(${globalIndex})">Insert</button>
-                    <button class="btn-danger" onclick="deleteRow(${globalIndex})">Delete</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    function keyNav(e, index, field, fid) {
-        if (e.key === 'Tab' || e.key === 'Enter') {
-            e.preventDefault();
-            const nextId = e.shiftKey ? `cell-${fid - 1}` : `cell-${fid + 1}`;
-            _nextFocusId = nextId;
-            update(index, field, e.target.value, true);
-        }
-    }
-
-    function update(index, field, value, viaKey = false) {
-        if (allData[index]) {
-            allData[index][field] = value;
-            loadInvoiceData();
-            if (viaKey && _nextFocusId) {
-                setTimeout(() => {
-                    const el = document.getElementById(_nextFocusId);
-                    if (el) { el.focus(); el.select(); }
-                    _nextFocusId = null;
-                }, 0);
-            }
-        }
-    }
-
-    function insertBelow(index) {
-        const item = allData[index];
-        const newItem = {
-            invoice_number: item.invoice_number,
-            invoice_date: item.invoice_date,
-            invoice_total: item.invoice_total,
-            supplier: item.supplier,
-            position: '',
-            part_number: '',
-            quantity: '',
-            unit: item.unit || '',
-            unit_price: '',
-            line_total: '',
-            net_weight: '',
-            country_of_origin: item.country_of_origin || ''
-        };
-        allData.splice(index + 1, 0, newItem);
-        loadInvoiceData();
-        showAlert('Row inserted', 'success');
-    }
-
-    function addBlankRowForCurrent() {
-        if (!currentInvoice) return;
-        const items = allData.filter(d => d.invoice_number === currentInvoice);
-        const base = items[0] || { invoice_number: currentInvoice, invoice_date: '', invoice_total: '', supplier: '' };
-        allData.push({
-            invoice_number: base.invoice_number,
-            invoice_date: base.invoice_date,
-            invoice_total: base.invoice_total,
-            supplier: base.supplier,
-            position: '',
-            part_number: '',
-            quantity: '',
-            unit: '',
-            unit_price: '',
-            line_total: '',
-            net_weight: '',
-            country_of_origin: ''
-        });
-        loadInvoiceData();
-        showAlert('Blank row added for manual entry', 'success');
-    }
-
-    function deleteRow(index) {
-        if (!confirm('Delete this line item?')) return;
-        allData.splice(index, 1);
-        loadInvoiceData();
-        showAlert('Row deleted', 'success');
-    }
-
-    function updateValidation() {
-        const items = allData.filter(d => d.invoice_number === currentInvoice);
-        if (items.length === 0) return;
-
-        const invTotal = parseFloat(items[0].invoice_total || 0);
-        const sum = items.reduce((s, item) => s + (parseFloat(item.line_total) || 0), 0);
-        const diff = Math.abs(invTotal - sum);
-
-        document.getElementById('statSum').textContent = '$' + sum.toLocaleString('en-US', { minimumFractionDigits: 2 });
-        const diffEl = document.getElementById('statDiff');
-        diffEl.textContent = '$' + diff.toLocaleString('en-US', { minimumFractionDigits: 2 });
-        if (diff < 0.02) {
-            diffEl.classList.remove('error'); diffEl.classList.add('success');
-        } else {
-            diffEl.classList.remove('success'); diffEl.classList.add('error');
-        }
-        document.getElementById('statItems').textContent = items.length;
-    }
-
-    function exportToExcel() {
-        if (allData.length === 0) {
-            showAlert('No data to export', 'error');
-            return;
-        }
-
-        const wb = XLSX.utils.book_new();
-        const headers = [
-            'InvoiceNumber','InvoiceDate','InvoiceTotal','SupplierMID','SupplierName',
-            'BuyerPartNumber','SupplierPartNumber','Quantity','UnitOfMeasure','Description',
-            'UnitPrice','ItemTotal','CurrencyCode','ExchangeRate','CountryOfOrigin',
-            'CountryOfExport','DateOfExport','PortOfLading','RelatedParty','PO_Number',
-            'PO_Date','GrossWeight','GrossWeightUnit','NetWeight','TariffNumber',
-            'TariffDescription','Quantity1','UnitOfMeasure1','Quantity2','UnitOfMeasure2',
-            'Quantity3','UnitOfMeasure3','PrimarySPI','SecondarySPI','DeliverTo',
-            'SoldTo','SecondaryTariffNumber'
-        ];
-        const rows = [headers];
-
-        function normalizePartNumber(p) {
-            const s = (p || '').toString();
-            const firstSegment = s.split('.')[0];
-            return firstSegment.slice(0, 5);
-        }
-
-        allData.forEach(item => {
-            const row = new Array(37).fill('');
-            row[0] = item.invoice_number;
-            row[1] = item.invoice_date;
-            row[2] = parseFloat(item.invoice_total) || '';
-            row[3] = '';
-            row[4] = item.supplier;
-            row[5] = '';
-            row[6] = normalizePartNumber(item.part_number);
-            row[7] = parseFloat(item.quantity) || '';
-            row[8] = item.unit;
-            row[9] = '';
-            row[10] = parseFloat(item.unit_price) || '';
-            row[11] = parseFloat(item.line_total) || '';
-            row[12] = 'USD';
-            row[13] = '';
-            row[14] = item.country_of_origin;
-            row[23] = parseFloat(item.net_weight) || '';
-            rows.push(row);
-        });
-
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        XLSX.utils.book_append_sheet(wb, ws, 'Invoice Data');
-
-        const date = new Date().toISOString().slice(0, 10);
-        const base = uploadedPdfName || `all_invoices_${date}`;
-        const filename = `${base}.xlsx`;
-        XLSX.writeFile(wb, filename);
-
-        showAlert(`✅ Exported all ${allData.length} line items from ${new Set(allData.map(d => d.invoice_number)).size} invoices!`, 'success');
-    }
-
-    function resetUpload() {
-        allData = [];
-        currentInvoice = '';
-        invoiceOrder = [];
-        document.getElementById('controls').style.display = 'none';
-        hideDataView();
-        document.getElementById('uploadSection').style.display = 'block';
-        document.getElementById('fileInput').value = '';
-    }
-
-    function showAlert(msg, type) {
-        const alert = document.getElementById('alert');
-        alert.textContent = msg;
-        alert.className = `alert ${type}`;
-        alert.style.display = 'block';
-        setTimeout(() => alert.style.display = 'none', 5000);
-    }
+  }
+
+  function keyNav(e,index,field,fid){ if(e.key==='Tab'||e.key==='Enter'){ e.preventDefault(); const nextId=e.shiftKey?`cell-${fid-1}`:`cell-${fid+1}`; _nextFocusId=nextId; update(index,field,e.target.value,true); } }
+  function update(index,field,value,viaKey=false){ if(allData[index]){ allData[index][field]=value; loadInvoiceData(); if(viaKey&&_nextFocusId){ setTimeout(()=>{ const el=document.getElementById(_nextFocusId); if(el){el.focus(); el.select();} _nextFocusId=null; },0); } } }
+  function insertBelow(index){ const it=allData[index]; const n={invoice_number:it.invoice_number,invoice_date:it.invoice_date,invoice_total:it.invoice_total,supplier:it.supplier,position:'',part_number:'',quantity:'',unit:it.unit||'',unit_price:'',line_total:'',net_weight:'',country_of_origin:it.country_of_origin||''}; allData.splice(index+1,0,n); loadInvoiceData(); showAlert('Row inserted','success'); }
+  function addBlankRowForCurrent(){ if(!currentInvoice) return; const items=allData.filter(d=>d.invoice_number===currentInvoice); const base=items[0]||{invoice_number:currentInvoice,invoice_date:'',invoice_total:'',supplier:''}; allData.push({invoice_number:base.invoice_number,invoice_date:base.invoice_date,invoice_total:base.invoice_total,supplier:base.supplier,position:'',part_number:'',quantity:'',unit:'',unit_price:'',line_total:'',net_weight:'',country_of_origin:''}); loadInvoiceData(); showAlert('Blank row added for manual entry','success'); }
+  function deleteRow(index){ if(!confirm('Delete this line item?')) return; allData.splice(index,1); loadInvoiceData(); showAlert('Row deleted','success'); }
+
+  function updateValidation(){ const items=allData.filter(d=>d.invoice_number===currentInvoice); if(items.length===0) return; const invTotal=parseFloat(items[0].invoice_total||0); const sum=items.reduce((s,it)=> s + (parseFloat(it.line_total)||0), 0); const diff=Math.abs(invTotal - sum); document.getElementById('statSum').textContent='$'+sum.toLocaleString('en-US',{minimumFractionDigits:2}); const diffEl=document.getElementById('statDiff'); diffEl.textContent='$'+diff.toLocaleString('en-US',{minimumFractionDigits:2}); if(diff<0.02){ diffEl.classList.remove('error'); diffEl.classList.add('success'); } else { diffEl.classList.remove('success'); diffEl.classList.add('error'); } document.getElementById('statItems').textContent=items.length; }
+
+  function exportToExcel(){ if(allData.length===0){ showAlert('No data to export','error'); return; }
+    const wb=XLSX.utils.book_new();
+    const headers=['InvoiceNumber','InvoiceDate','InvoiceTotal','SupplierMID','SupplierName','BuyerPartNumber','SupplierPartNumber','Quantity','UnitOfMeasure','Description','UnitPrice','ItemTotal','CurrencyCode','ExchangeRate','CountryOfOrigin','CountryOfExport','DateOfExport','PortOfLading','RelatedParty','PO_Number','PO_Date','GrossWeight','GrossWeightUnit','NetWeight','TariffNumber','TariffDescription','Quantity1','UnitOfMeasure1','Quantity2','UnitOfMeasure2','Quantity3','UnitOfMeasure3','PrimarySPI','SecondarySPI','DeliverTo','SoldTo','SecondaryTariffNumber'];
+    const rows=[headers];
+    function normalizePartNumber(p){ const s=(p||'').toString(); const firstSegment=s.split('.')[0]; return firstSegment.slice(0,5); }
+    allData.forEach(item=>{ const row=new Array(37).fill(''); row[0]=item.invoice_number; row[1]=item.invoice_date; row[2]=parseFloat(item.invoice_total)||''; row[3]=''; row[4]=item.supplier; row[5]=''; row[6]=normalizePartNumber(item.part_number); row[7]=parseFloat(item.quantity)||''; row[8]=item.unit; row[9]=''; row[10]=parseFloat(item.unit_price)||''; row[11]=parseFloat(item.line_total)||''; row[12]='USD'; row[13]=''; row[14]=item.country_of_origin; row[23]=parseFloat(item.net_weight)||''; rows.push(row); });
+    const ws=XLSX.utils.aoa_to_sheet(rows); XLSX.utils.book_append_sheet(wb, ws, 'Invoice Data');
+    const date=new Date().toISOString().slice(0,10); const base=uploadedPdfName || `all_invoices_${date}`; const filename=`${base}.xlsx`; XLSX.writeFile(wb, filename);
+    showAlert(`✅ Exported all ${allData.length} line items from ${new Set(allData.map(d=>d.invoice_number)).size} invoices!`,'success');
+  }
+
+  function resetUpload(){ allData=[]; currentInvoice=''; invoiceOrder=[]; uploadedPdfName=''; document.getElementById('controls').style.display='none'; hideDataView(); document.getElementById('uploadSection').style.display='block'; document.getElementById('fileInput').value=''; }
+  function showAlert(msg,type){ const el=document.getElementById('alert'); el.textContent=msg; el.className=`alert ${type}`; el.style.display='block'; setTimeout(()=> el.style.display='none', 5000); }
 </script>
 </body>
 </html>
