@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Invoice PDF Parser & Editor</title>
-    <!-- pdf.js core -->
+    <!-- pdf.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- xlsx -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -156,6 +156,9 @@
 </div>
 
 <script>
+    // === CONFIG ===
+    const DEBUG = true;
+
     // pdf.js worker
     pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -217,7 +220,7 @@
                     const pageText = items.map(it => (it && typeof it.str === 'string') ? it.str : '').join(' ');
                     fullText += (pageText || '') + '\n';
                 } catch (perPageErr) {
-                    console.warn(`Failed to read page ${i}:`, perPageErr);
+                    if (DEBUG) console.warn(`Failed to read page ${i}:`, perPageErr);
                 }
             }
 
@@ -247,29 +250,58 @@
         }
     }
 
+    // Robust invoice segmentation:
+    // Find each "Customs Invoice <id> [optional stuff]" header and take the text until the next header
+    function segmentInvoices(text) {
+        const headerRe = /Customs\s+Invoice\s+([0-9A-Za-z\-]+)(?:\s+(?:from|–|-).*)?/gi;
+        const matches = [...text.matchAll(headerRe)];
+        const segments = [];
+
+        if (DEBUG) console.log(`Found ${matches.length} invoice headers`);
+
+        for (let i = 0; i < matches.length; i++) {
+            const m = matches[i];
+            const startIdx = m.index ?? 0;
+            const endIdx = (i < matches.length - 1) ? (matches[i + 1].index ?? text.length) : text.length;
+
+            const rawNumber = (m[1] || '').trim();
+            // Normalize invoice number to digits only (strips trailing letters like "m")
+            const normalized = (rawNumber.match(/\d+/) || [''])[0];
+
+            segments.push({
+                invoice_number: normalized || rawNumber,
+                start: startIdx,
+                end: endIdx,
+                body: text.slice(startIdx + m[0].length, endIdx)
+            });
+        }
+        return segments;
+    }
+
     function parseInvoices(text) {
         allData = [];
         invoiceOrder = [];
 
         text = (typeof text === 'string') ? text : '';
 
-        const splits = text.split(/Customs\s+Invoice\s+(\d+)\s+from/gi);
-        const invoiceGroups = {};
+        const segments = segmentInvoices(text);
 
-        for (let i = 1; i < splits.length; i += 2) {
-            const invoiceNum = splits[i];
-            const sectionText = splits[i + 1];
-            if (!invoiceNum || !sectionText) continue;
-
-            if (!invoiceGroups[invoiceNum]) {
-                invoiceOrder.push(invoiceNum);
-                invoiceGroups[invoiceNum] = '';
-            }
-            invoiceGroups[invoiceNum] += sectionText + '\n';
+        if (segments.length === 0) {
+            if (DEBUG) console.warn('No invoice headers matched. Check header pattern.');
+            return;
         }
 
-        Object.keys(invoiceGroups).forEach(invoiceNum => {
-            const sectionText = invoiceGroups[invoiceNum] || '';
+        // Preserve order as discovered
+        invoiceOrder = segments.map(s => s.invoice_number);
+
+        for (const seg of segments) {
+            const invoiceNum = seg.invoice_number;
+            const sectionText = seg.body || '';
+
+            if (DEBUG) {
+                console.log(`\n=== PROCESSING INVOICE ${invoiceNum} ===`);
+                console.log('First 400 chars:', sectionText.substring(0, 400));
+            }
 
             // date
             const dateMatch = sectionText.match(/^\s*(\d{2}\/\d{2}\/\d{4})/);
@@ -338,6 +370,12 @@
             const positionsFound = new Set();
             const lineItems = [];
 
+            function normalizePartNumber(raw) {
+                // Take first 5 leading digits if available; else fallback to first 5 chars
+                const m = (raw || '').match(/^\D*(\d{5})/);  // skip any leading non-digits, then 5 digits
+                return (m && m[1]) ? m[1] : (raw || '').slice(0, 5);
+            }
+
             function pushItem(c) {
                 const {
                     position, partNumber, containerQty,
@@ -366,7 +404,7 @@
                     invoice_total: invoiceTotal,
                     supplier: supplier,
                     position,
-                    part_number: partNumber,
+                    part_number: normalizePartNumber(partNumber),
                     quantity,
                     unit,
                     unit_price: unitPrice,
@@ -386,7 +424,7 @@
 
                 pushItem({
                     position,
-                    partNumber: (mA[2] || '').slice(0, 32),
+                    partNumber: (mA[2] || ''),
                     containerQty: (mA[3] || '').replace(/,/g, ''),
                     perUnitQty: (mA[4] || '').replace(/,/g, ''),
                     perUnitType: mA[5] || '',
@@ -408,7 +446,7 @@
 
                 pushItem({
                     position,
-                    partNumber: (mB[2] || '').slice(0, 32),
+                    partNumber: (mB[2] || ''),
                     containerQty: (mB[3] || '').replace(/,/g, ''),
                     perUnitQty: '',
                     perUnitType: '',
@@ -421,7 +459,9 @@
                 });
             }
 
-            // Post-parse: enrich with per-line weight and COO if present
+            if (DEBUG) console.log(`Parsed ${lineItems.length} line(s) for invoice ${invoiceNum}`);
+
+            // Post-parse enrich (weight, COO)
             lineItems.forEach((item, idx) => {
                 const startPos = item.matchIndex ?? 0;
                 const endPos = idx < lineItems.length - 1 ? (lineItems[idx + 1].matchIndex ?? (startPos + 2000)) : (startPos + 3000);
@@ -447,7 +487,7 @@
             });
 
             allData.push(...lineItems);
-        });
+        }
     }
 
     function setupInterface() {
